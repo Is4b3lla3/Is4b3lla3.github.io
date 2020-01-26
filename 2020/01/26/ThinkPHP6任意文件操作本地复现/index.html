@@ -28,7 +28,7 @@
 <p>根据文件目录和更改的函数部分猜测：可能是存储Session时导致的文件写入；然后跟进找一下相关的函数，可以看到<code>vendor/topthink/framework/src/think/session/Store.php:254</code>的save()函数，265行还可以对文件进行删除操作，并且对后端业务逻辑依赖较低<br><img src="save.png" alt="save"></p>
 <p>可以看到设置了$sessionId，并且调用了一个write函数，继续跟进，找到write()函数<code>vendor/topthink/framework/src/think/session/driver/File.php:210</code><br><img src="write.png" alt="write"></p>
 <p>继续跟进，找到writeFile()函数<br><img src="writeFile.png" alt="writeFile"></p>
-<p>可以看到调用了<code>file_put_contents()</code>函数，这里是真正写入文件的操作了<br><img src="file_put_contents" alt="file_put_contents"></p>
+<p>可以看到调用了<code>file_put_contents()</code>函数，这里是真正写入文件的操作了<br><img src="file_put_contents.png" alt="file_put_contents"></p>
 <ul>
 <li>接下来我们反向分析一下，看看能不能找到可控点</li>
 </ul>
