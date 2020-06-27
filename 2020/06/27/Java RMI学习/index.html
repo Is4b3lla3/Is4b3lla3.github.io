@@ -99,7 +99,7 @@
 <ul>
 <li><strong>JNDI注入的利用方法中也借助了动态加载类的思路</strong>。</li>
 <li>这里涉及到的角色：客户端、RMI注册表、远程对象服务器、托管class文件的Web服务器可以分别位于不同的主机上：<br><img src="./%E5%8A%A8%E6%80%81%E5%8A%A0%E8%BD%BD%E7%B1%BB.png" alt="动态加载类"><h1 id="JNDI"><a href="#JNDI" class="headerlink" title="JNDI"></a>JNDI</h1>JNDI (Java Naming and Directory Interface) 是一组应用程序接口，它为开发人员查找和访问各种资源提供了统一的通用接口，可以用来定位用户、网络、机器、对象和服务等各种资源。比如可以利用JNDI在局域网上定位一台打印机，也可以用JNDI来定位数据库服务或一个远程Java对象。JNDI底层<strong>支持RMI远程对象</strong>，RMI注册的服务可以通过JNDI接口来访问和调用。</li>
-<li>其实JNDI就如同Windows系统的注册表一样:<code>键:值</code><br><img src="./JNDI.jpg" alt="JNDI"><blockquote>
+<li>其实JNDI就如同Windows系统的注册表一样:<code>键:值</code><br><img src="./JNDI.png" alt="JNDI"><blockquote>
 <p>JNDI：<code>路径+名称:对象名称</code><br>JNDI支持多种命名和目录提供程序（Naming and Directory Providers），RMI注册表服务提供程序（RMI Registry Service Provider）允许通过JNDI应用接口对RMI中注册的远程对象进行访问操作。将RMI服务绑定到JNDI的一个好处是更加透明、统一和松散耦合，RMI客户端直接通过URL来定位一个远程对象，而且该RMI服务可以和包含人员，组织和网络资源等信息的企业目录链接在一起。</p>
 </blockquote>
 </li>
