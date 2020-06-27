@@ -1,0 +1,110 @@
+<!DOCTYPE html><html lang="zh-cn"><head><meta charset="UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta name="description" content="Java RMI学习"><meta name="keywords" content=""><meta name="author" content="Zhangcs"><meta name="copyright" content="Zhangcs"><title>Java RMI学习 | Isabellae's Blog</title><link rel="shortcut icon" href="/terminal_emulator.ico"><link rel="stylesheet" href="/css/index.css?version=1.6.1"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/font-awesome@latest/css/font-awesome.min.css?version=1.6.1"><link rel="dns-prefetch" href="https://cdn.staticfile.org"><link rel="dns-prefetch" href="https://cdn.bootcss.com"><link rel="dns-prefetch" href="https://creativecommons.org"><script>var GLOBAL_CONFIG = { 
+  root: '/',
+  algolia: undefined,
+  localSearch: undefined,
+  copy: {
+    success: 'Copy successfully',
+    error: 'Copy error',
+    noSupport: 'The browser does not support'
+  }
+} </script></head><body><canvas class="fireworks"></canvas><i class="fa fa-arrow-right" id="toggle-sidebar" aria-hidden="true"></i><div id="sidebar"><div class="toggle-sidebar-info text-center"><span data-toggle="Toggle article">Toggle site</span><hr></div><div class="sidebar-toc"><div class="sidebar-toc__title">Catalog</div><div class="sidebar-toc__progress"><span class="progress-notice">You've read</span><span class="progress-num">0</span><span class="progress-percentage">%</span><div class="sidebar-toc__progress-bar"></div></div><div class="sidebar-toc__content"><ol class="toc"><li class="toc-item toc-level-1"><a class="toc-link" href="#前言"><span class="toc-number">1.</span> <span class="toc-text">前言</span></a></li><li class="toc-item toc-level-1"><a class="toc-link" href="#Java-RMI的定义"><span class="toc-number">2.</span> <span class="toc-text">Java RMI的定义</span></a></li><li class="toc-item toc-level-1"><a class="toc-link" href="#原理"><span class="toc-number">3.</span> <span class="toc-text">原理</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#RMI包含部分："><span class="toc-number">3.1.</span> <span class="toc-text">RMI包含部分：</span></a></li></ol></li><li class="toc-item toc-level-1"><a class="toc-link" href="#Java-RMI示例"><span class="toc-number">4.</span> <span class="toc-text">Java RMI示例</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#远程方法调用"><span class="toc-number">4.1.</span> <span class="toc-text">远程方法调用</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#远程对象"><span class="toc-number">4.2.</span> <span class="toc-text">远程对象</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#客户端"><span class="toc-number">4.3.</span> <span class="toc-text">客户端</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#如何获取Stub"><span class="toc-number">4.4.</span> <span class="toc-text">如何获取Stub</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#服务端"><span class="toc-number">4.5.</span> <span class="toc-text">服务端</span></a></li></ol></li><li class="toc-item toc-level-1"><a class="toc-link" href="#运行实例"><span class="toc-number">5.</span> <span class="toc-text">运行实例</span></a></li><li class="toc-item toc-level-1"><a class="toc-link" href="#总结一下RMI-流程"><span class="toc-number">6.</span> <span class="toc-text">总结一下RMI 流程</span></a></li><li class="toc-item toc-level-1"><a class="toc-link" href="#动态加载类"><span class="toc-number">7.</span> <span class="toc-text">动态加载类</span></a></li><li class="toc-item toc-level-1"><a class="toc-link" href="#JNDI"><span class="toc-number">8.</span> <span class="toc-text">JNDI</span></a></li><li class="toc-item toc-level-1"><a class="toc-link" href="#引用"><span class="toc-number">9.</span> <span class="toc-text">引用</span></a></li></ol></div></div><div class="author-info hide"><div class="author-info__avatar text-center"><img src="/IMG_20190204_224358.jpg"></div><div class="author-info__name text-center">Zhangcs</div><div class="author-info__description text-center">Sec researcher</div><div class="follow-button"><a href="https://github.com/is4b3lla3" target="_blank" rel="noopener">Follow Me</a></div><hr><div class="author-info-articles"><a class="author-info-articles__archives article-meta" href="/archives"><span class="pull-left">Articles</span><span class="pull-right">7</span></a><a class="author-info-articles__tags article-meta" href="/tags"><span class="pull-left">Tags</span><span class="pull-right">4</span></a><a class="author-info-articles__categories article-meta" href="/categories"><span class="pull-left">Categories</span><span class="pull-right">4</span></a></div><hr><div class="author-info-links"><div class="author-info-links__title text-center">友情链接</div><a class="author-info-links__name text-center" href="http://www.y1nhui.com/" target="_blank" rel="noopener">y1nhui</a><a class="author-info-links__name text-center" href="http://www.adminxt.com/" target="_blank" rel="noopener">adminxt</a></div></div></div><div id="content-outer"><div id="top-container" style="background-image: url(/2700d379fda645e77d754fc4956024c6.jpg)"><div id="page-header"><span class="pull-left"> <a id="site-name" href="/">Isabellae's Blog</a></span><i class="fa fa-bars toggle-menu pull-right" aria-hidden="true"></i><span class="pull-right menus"><a class="site-page" href="/">Home</a><a class="site-page" href="/archives">Archives</a><a class="site-page" href="/tags">Tags</a><a class="site-page" href="/categories">Categories</a><a class="site-page" href="/links">links</a></span></div><div id="post-info"><div id="post-title">Java RMI学习</div><div id="post-meta"><time class="post-meta__date"><i class="fa fa-calendar" aria-hidden="true"></i> 2020-06-27</time></div></div></div><div class="layout" id="content-inner"><article id="post"><div class="article-container" id="post-content"><h1 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h1><p>本文是一个学习Java反序列化漏洞的一个前置文章，总结学习Java RMI的调用流程以及原理</p>
+<a id="more"></a>
+
+<h1 id="Java-RMI的定义"><a href="#Java-RMI的定义" class="headerlink" title="Java RMI的定义"></a>Java RMI的定义</h1><p>Java远程方法调用，即Java RMI (Java Remote Method Invocation)，是Java编程语言里，一种用于<strong>实现远程过程调用的应用程序编程接口</strong>。它使客户机上运行的程序可以直接调用远程服务器上的对象。远程方法调用特性使Java编程人员能够在网络环境中分布操作。</p>
+<p>RMI（Remote Method Invocation）为远程方法调用，是允许运行在一个Java虚拟机的对象调用运行在另一个Java虚拟机上的对象的方法。这两个虚拟机可以是运行在相同计算机上的不同进程中，也可以是运行在网络上的不同计算机中。</p>
+<p>在RMI中<strong>对象是通过序列化方式进行编码传输的</strong>。（基于序列化和反序列化就可能存在反序列化漏洞了）<br><strong>RMI的基础是接口，RMI构架基于一个重要的原理：定义接口和<em>定义接口的具体</em>实现是分开的。</strong></p>
+<h1 id="原理"><a href="#原理" class="headerlink" title="原理"></a>原理</h1><p>RMI能让一个Java程序去调用网络中另一台计算机的Java对象的方法，那么调用的效果就像是在本机上调用一样。通俗的讲：A机器上面有一个class，通过远程调用，B机器调用这个class 中的方法。</p>
+<h2 id="RMI包含部分："><a href="#RMI包含部分：" class="headerlink" title="RMI包含部分："></a>RMI包含部分：</h2><ol>
+<li>远程服务的接口定义</li>
+<li>远程服务接口的具体实现</li>
+<li>存根（Stub）和骨架（Skeleton）文件</li>
+<li>一个运行远程服务的服务器</li>
+<li>一个RMI命名服务，它允许客户端去发现这个远程服务</li>
+<li>类文件的提供者（一个HTTP或者FTP服务器）</li>
+<li>一个需要这个远程服务的客户端程序<h1 id="Java-RMI示例"><a href="#Java-RMI示例" class="headerlink" title="Java RMI示例"></a>Java RMI示例</h1><h2 id="远程方法调用"><a href="#远程方法调用" class="headerlink" title="远程方法调用"></a>远程方法调用</h2>远程方法调用是分布式编程中的一个基本思想。而RMI（Remote Method Invocation）是专为Java环境设计的远程方法调用机制，远程服务器实现具体的Java方法并提供接口，客户端本地仅需根据接口类的定义，提供相应的参数即可调用远程方法。RMI依赖的通信协议为JRMP(Java Remote Message Protocol ，Java 远程消息交换协议)，该协议为Java定制，要求服务端与客户端都为Java编写。这个协议就像HTTP协议一样，规定了客户端和服务端通信要满足的规范。在RMI中对象是通过<strong>序列化方式</strong>进行编码传输的。<h2 id="远程对象"><a href="#远程对象" class="headerlink" title="远程对象"></a>远程对象</h2></li>
+<li>首先我们定义一个远程接口<code>Clock.java</code><ul>
+<li>定义远程服务接口（interface）</li>
+<li>远程接口必须继承Remote</li>
+<li>远程方法必须抛出RemoteException<blockquote>
+<p>在Java中，只要一个类extends了java.rmi.Remote接口，即可成为存在于服务器端的远程对象， 供客户端访问并提供一定的服务。JavaDoc描述：Remote 接口用于标识其方法可以从非本地虚拟机上调用的接口。任何远程对象都必须直接或间接实现此接口。只有在“远程接口” 扩展 java.rmi.Remote 的接口）中指定的这些方法才可被远程调用</p>
+</blockquote>
+</li>
+</ul>
+</li>
+</ol>
+<p><img src="./Clock.png" alt="Clock.java"><br>2. 接下来定义远程接口的实现<code>ClockImpl.java</code><br><img src="./ClockImpl.png" alt="ClockImpl.java"></p>
+<blockquote>
+<ul>
+<li>远程对象必须实现java.rmi.server.UniCastRemoteObject类，这样才能保证客户端访问获得远程对象时，</li>
+<li>该远程对象将会把自身的一个拷贝以Socket的形式传输给客户端，此时客户端所获得的这个拷贝称为”stub”(存根)，</li>
+<li>而服务器端本身已存在的远程对象则称之为”Skeleton”(骨架)。其实此时的存根是客户端的一个代理，用于与服务器端的通信，</li>
+<li>而骨架也可认为是服务器端的一个代理，用于接收客户端的请求之后调用远程方法来响应客户端的请求。</li>
+</ul>
+</blockquote>
+<h2 id="客户端"><a href="#客户端" class="headerlink" title="客户端"></a>客户端</h2><ol>
+<li>根据主机和端口，获得服务注册器的引用</li>
+<li>注册器根据服务名称查找对应的服务，并返回给客户端（Stub—-客户端代理）</li>
+<li>客户对象通过Stub发送请求</li>
+<li>Stub将调用信息（变量、方法名称等）打包，通过网络将它发送给Skeleton（服务辅助对象）</li>
+<li>Skeleton将来自Stub的信息解包，找出被调用的方法（以及在哪个对象内），然后调用真正的服务对象上的真正方法</li>
+<li>服务对象执行方法，获得返回结果，并将结果返回给Skeleton</li>
+<li>Skeleton将返回结果打包，通过网络返回给Stub（注意返回结果必须是可序列化的）</li>
+<li>Stub接受到数据后解包，返回给客户对象。</li>
+<li>客户端所在的JVM启动后，可以多次调用服务端对象的方法。<blockquote>
+<p>stub和skeleton代理都是在服务端程序中由RMI系统动态生成,服务端程序只需要继承java.rmi.server.UnicastRemoteObject类即可</p>
+</blockquote>
+<h2 id="如何获取Stub"><a href="#如何获取Stub" class="headerlink" title="如何获取Stub"></a>如何获取Stub</h2></li>
+<li>调用某个远程服务上的方法，向远程服务获取存根<br>JDK提供了一个RMI注册表（RMIRegistry），RMIRegistry也是一个远程对象，默认监听在1099端口上，可以使用代码启动RMIRegistry，也可以使用rmiregistry命令。</li>
+</ol>
+<ul>
+<li>要注册远程对象，需要RMI URL和一个远程对象的引用。</li>
+<li><code>LocateRegistry.getRegistry()</code>会使用给定的主机和端口等信息本地创建一个Stub对象作为Registry远程对象的代理，从而启动整个远程调用逻辑。服务端应用程序可以向RMI注册表中注册远程对象，然后客户端向RMI注册表查询某个远程对象名称，来获取该远程对象的Stub。<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//创建Clock实例</span></span><br><span class="line">Clock impl = <span class="keyword">new</span> ClockImpl();</span><br><span class="line">LocateRegistry.createRegistry(<span class="number">1099</span>);</span><br><span class="line">Registry registry = LocateRegistry.getRegistry();</span><br><span class="line">registry.bind(<span class="string">"Clock"</span>,stub);</span><br></pre></td></tr></table></figure>
+从客户端角度来看服务端，服务端开启了两个端口，一个是RMI注册端口默认为1099，另一个是远程对象通信端口，由JVM随机分配，</li>
+<li>客户端代码<code>ClockClient.java</code><br><img src="./ClockClient.png" alt="ClockClient.java"></li>
+</ul>
+<h2 id="服务端"><a href="#服务端" class="headerlink" title="服务端"></a>服务端</h2><p>Clock是暴露在网络中的接口，ClockImpl是一个服务端远程对象，重写了一个Hello方法供远程调用。它没有继承UnicastRemoteObject类，我们可以在构造方法中调用<code>UnicastRemoteObject.exportObject()</code>例如：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">public</span> <span class="title">ClockImpl</span><span class="params">()</span> <span class="keyword">throws</span> RemoteException</span>&#123;</span><br><span class="line">    UnicastRemoteObject.exportObject(<span class="keyword">this</span>, <span class="number">1099</span>);</span><br><span class="line">    &#125;</span><br></pre></td></tr></table></figure>
+<p>也可以稍后在服务端代码中调用</p>
+<ul>
+<li>服务端代码<code>ClockServer.java</code><br><img src="./ClockServer.png" alt="ClockServer.java"><blockquote>
+<p>注册远程对象,向客户端提供远程对象服务远程对象是在远程服务上创建的，你无法确切地知道远程服务器上的对象的名称。但是，将远程对象注册到RMI Service之后，客户端就可以通过RMI Service请求到该远程服务对象的stub了，利用stub代理就可以访问远程服务对象了</p>
+</blockquote>
+</li>
+</ul>
+<ul>
+<li>服务端的流程是：</li>
+</ul>
+<ol>
+<li>定义远程服务接口（interface）</li>
+<li>定义远程服务接口的具体实现（implement）</li>
+<li>将该远程服务注册到RMI命名服务上（指定主机及端口）（registry）</li>
+<li>启动远程服务所在的jvm线程，此时服务端处于运行中。</li>
+</ol>
+<h1 id="运行实例"><a href="#运行实例" class="headerlink" title="运行实例"></a>运行实例</h1><ol>
+<li>先运行服务端<br><img src="./server.png" alt="server"></li>
+<li>运行客户端，调用成功<br><img src="./client.png" alt="client"></li>
+</ol>
+<h1 id="总结一下RMI-流程"><a href="#总结一下RMI-流程" class="headerlink" title="总结一下RMI 流程"></a>总结一下RMI 流程</h1><ol>
+<li>服务端ClockImpl()继承Clock()创建远程对象</li>
+<li>服务端CLock()注册远程对象</li>
+<li>客户端访问服务器b并查找相应远程对象</li>
+<li>服务器将stub(存根返回)客户端</li>
+<li>客户端调用stub(存根)的方法</li>
+<li>stub(存根)作为代理与服务端骨架通信   //骨架作为服务端代理</li>
+<li>骨架代理调用ClockImpl相应方法</li>
+<li>骨架将结果返回给客户端的存根</li>
+<li>存根返回给客户端<br><img src="./%E4%BD%93%E7%B3%BB%E7%BB%93%E6%9E%84.jpg" alt="RMI体系结构"></li>
+</ol>
+<h1 id="动态加载类"><a href="#动态加载类" class="headerlink" title="动态加载类"></a>动态加载类</h1><p>RMI核心特点之一就是动态类加载，如果当前JVM中没有某个类的定义，它可以从远程URL去下载这个类的class，动态加载的对象class文件可以使用Web服务的方式进行托管。这可以动态的扩展远程应用的功能，RMI注册表上可以动态的加载绑定多个RMI应用。对于客户端而言，服务端返回值也可能是一些子类的对象实例，而客户端并没有这些子类的class文件，如果需要客户端正确调用这些子类中被重写的方法，则同样需要有运行时动态加载额外类的能力。客户端使用了与RMI注册表相同的机制。RMI服务端将URL传递给客户端，客户端通过HTTP请求下载这些类。</p>
+<ul>
+<li>JNDI注入的利用方法中也借助了动态加载类的思路。</li>
+<li>这里涉及到的角色：客户端、RMI注册表、远程对象服务器、托管class文件的Web服务器可以分别位于不同的主机上：<br><img src="./%E5%8A%A8%E6%80%81%E5%8A%A0%E8%BD%BD%E7%B1%BB.png" alt="动态加载类"><h1 id="JNDI"><a href="#JNDI" class="headerlink" title="JNDI"></a>JNDI</h1></li>
+</ul>
+<h1 id="引用"><a href="#引用" class="headerlink" title="引用"></a>引用</h1><ul>
+<li><a href="https://blog.csdn.net/xinghun_4/article/details/45787549" target="_blank" rel="noopener">java RMI原理详解</a></li>
+<li><a href="https://kingx.me/Exploit-Java-Deserialization-with-RMI.html" target="_blank" rel="noopener">深入理解JNDI注入与Java反序列化漏洞利用</a></li>
+</ul>
+</div></article><div class="post-copyright"><div class="post-copyright__author"><span class="post-copyright-meta">Author: </span><span class="post-copyright-info"><a href="mailto:undefined" target="_blank" rel="noopener">Zhangcs</a></span></div><div class="post-copyright__type"><span class="post-copyright-meta">Link: </span><span class="post-copyright-info"><a href="http://is4b3lla3.github.io/2020/06/27/Java%20RMI%E5%AD%A6%E4%B9%A0/">http://is4b3lla3.github.io/2020/06/27/Java%20RMI%E5%AD%A6%E4%B9%A0/</a></span></div><div class="post-copyright__notice"><span class="post-copyright-meta">Copyright Notice: </span><span class="post-copyright-info">All articles in this blog are licensed under <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank" rel="noopener">CC BY-NC-SA 4.0</a> unless stating additionally.</span></div></div><div class="post-meta__tag-list"></div><nav id="pagination"><div class="next-post pull-right"><a href="/2020/06/15/%E5%8F%8D%E5%BA%8F%E5%88%97%E5%8C%96%E5%92%8CXXE/"><span>PHP反序列化和XXE的学习</span><i class="fa fa-chevron-right"></i></a></div></nav></div></div><footer class="footer-bg" style="background-image: url(/2700d379fda645e77d754fc4956024c6.jpg)"><div class="layout" id="footer"><div class="copyright">&copy;2013 - 2020 By Zhangcs</div><div class="framework-info"><span>Driven - </span><a href="http://hexo.io" target="_blank" rel="noopener"><span>Hexo</span></a><span class="footer-separator">|</span><span>Theme - </span><a href="https://github.com/Molunerfinn/hexo-theme-melody" target="_blank" rel="noopener"><span>Melody</span></a></div><div class="busuanzi"><script async src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script><span id="busuanzi_container_page_pv"><i class="fa fa-file-o"></i><span id="busuanzi_value_page_pv"></span><span></span></span></div></div></footer><i class="fa fa-arrow-up" id="go-up" aria-hidden="true"></i><script src="https://cdn.jsdelivr.net/npm/animejs@latest/anime.min.js"></script><script src="https://cdn.jsdelivr.net/npm/jquery@latest/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/@fancyapps/fancybox@latest/dist/jquery.fancybox.min.js"></script><script src="https://cdn.jsdelivr.net/npm/velocity-animate@latest/velocity.min.js"></script><script src="https://cdn.jsdelivr.net/npm/velocity-ui-pack@latest/velocity.ui.min.js"></script><script src="/js/utils.js?version=1.6.1"></script><script src="/js/fancybox.js?version=1.6.1"></script><script src="/js/sidebar.js?version=1.6.1"></script><script src="/js/copy.js?version=1.6.1"></script><script src="/js/fireworks.js?version=1.6.1"></script><script src="/js/transition.js?version=1.6.1"></script><script src="/js/scroll.js?version=1.6.1"></script><script src="/js/head.js?version=1.6.1"></script><script>if(/Android|webOS|iPhone|iPod|BlackBerry/i.test(navigator.userAgent)) {
+  $('#nav').addClass('is-mobile')
+  $('footer').addClass('is-mobile')
+}</script></body></html>
