@@ -41,7 +41,7 @@
 <p><img src="php.png" alt=""></p>
 <p>除了PPT里提到的trick，还能想到什么呢？</p>
 <ul>
-<li>面向对象中，类能够继承类的属性与方法。或许可以从这两个点入手，因为测试绕过了”牧云”，就暂时不放出来结果了。<br>至于为什么可以绕过：我的猜想是这个函数不在黑名单中，语法分析不够完善，引擎认为我们的vul代码并不能执行。</li>
+<li>面向对象中，类能够继承类的属性与方法。或许可以从这两个点入手，因为测试绕过了”牧云”，就暂时不放出来结果了。<br>至于为什么可以绕过：我的猜想是这个函数不在黑名单中，语法分析不够完善，引擎认为我们的vuln代码并不能执行。</li>
 </ul>
 <p><img src="result1.gif" alt=""></p>
 <h2 id="创建类的实例"><a href="#创建类的实例" class="headerlink" title="创建类的实例"></a>创建类的实例</h2><p><code>public ReflectionClass::newInstance( mixed $args[, mixed $...] ) : object</code><br>简单地说，这个方法可以创建一个类的实例，同时该函数传递的参数会传递到该类的构造函数<br>需要注意的是，该方法传参和<code>call_user_func()</code>相似，不能使用引用类型传参，如果要使用引用类型使用另一个方法<code>newInstanceArgs</code></p>
