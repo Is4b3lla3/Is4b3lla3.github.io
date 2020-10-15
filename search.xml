@@ -68,17 +68,9 @@
       </tags>
   </entry>
   <entry>
-    <title>test</title>
-    <url>/2019/10/28/test/</url>
-    <content><![CDATA[<h1 id="It-is-a-Test-Page"><a href="#It-is-a-Test-Page" class="headerlink" title="It is a Test Page"></a>It is a Test Page</h1><p>Hello World<br>最后编辑于2020.5.14</p>
-<a id="more"></a>
-<p>:)</p>
-]]></content>
-  </entry>
-  <entry>
     <title>Webshell免杀的思考与学习</title>
     <url>/2020/08/17/Webshell%E5%85%8D%E6%9D%80%E7%9A%84%E6%80%9D%E8%80%83%E4%B8%8E%E5%AD%A6%E4%B9%A0/</url>
-    <content><![CDATA[<h1 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h1><p><code>webshell</code>对于渗透测试者来说是既是一种结束也是一种开始；一个免杀的<code>webshell</code>是我们在渗透测试过程中能否拿到目标权限的一个“前提”，首先webshell需要存活，其次是否能够执行命令，最后我们使用webshell管理工具时流量是否被拦截。所以免杀至关重要。</p>
+    <content><![CDATA[<h1 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h1><p><code>webshell</code>对于渗透测试者来说是既是一种结束也是一种开始；一个免杀的<code>webshell</code>是我们在渗透测试过程中能否拿到目标权限的一个“前提”，首先webshell需要落地存活，其次是否能够执行命令，最后我们使用webshell管理工具时流量是否被拦截。所以免杀至关重要。</p>
 <a id="more"></a>
 <h1 id="我的第一个一句话木马"><a href="#我的第一个一句话木马" class="headerlink" title="我的第一个一句话木马"></a>我的第一个一句话木马</h1><p>很奇怪，我学习安全接触的的第一个一句话木马就是它：<code>$_GET[1]($_POST[2]);</code>，并且令我印象深刻。当时不太理解这个是因为PHP太灵活了，没想到还有这种写法：</p>
 <figure class="highlight php"><table><tr><td class="code"><pre><span class="line">$a = <span class="string">'assert'</span>;</span><br><span class="line">$a();</span><br></pre></td></tr></table></figure>
@@ -125,6 +117,56 @@
       </categories>
       <tags>
         <tag>Webshell免杀</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>test</title>
+    <url>/2019/10/28/test/</url>
+    <content><![CDATA[<h1 id="It-is-a-Test-Page"><a href="#It-is-a-Test-Page" class="headerlink" title="It is a Test Page"></a>It is a Test Page</h1><p>Hello World<br>最后编辑于2020.5.14</p>
+<a id="more"></a>
+<p>:)</p>
+]]></content>
+  </entry>
+  <entry>
+    <title>记一次在wamper64中增加php遇到的问题</title>
+    <url>/2020/01/31/%E8%AE%B0%E4%B8%80%E6%AC%A1%E5%9C%A8wamper64%E4%B8%AD%E5%A2%9E%E5%8A%A0php%E7%89%88%E6%9C%AC%E8%B8%A9%E8%BF%87%E7%9A%84%E5%9D%91/</url>
+    <content><![CDATA[<p>在wamper64中手动增加php版本碰到了不少问题，记录总结一下</p>
+<a id="more"></a>
+<h1 id="原因"><a href="#原因" class="headerlink" title="原因"></a>原因</h1><p>因为要复现joomla3.4.6的一个RCE，php要求在5.6.13下才行，我的wamper自带的php5只有5.6.40，所以需要我手动安装一个低版本</p>
+<h1 id="过程"><a href="#过程" class="headerlink" title="过程"></a>过程</h1><p>一开始我找我的小伙伴要了他的phpstudy下的php5.3.29，按照网上的方法配置好后wamper是橘色的，一看果然有个服务没启动，于是我查看后发现是apache没有正常启动，<br>查看了一下错误日志后发现是php目录下的wampserver.conf文件内容出了问题<br>最后定位到第9行：</p>
+<figure class="highlight php"><table><tr><td class="code"><pre><span class="line"><span class="meta">&lt;?php</span></span><br><span class="line">$phpConf[<span class="string">'phpIniDir'</span>] = <span class="string">'.'</span>;</span><br><span class="line">$phpConf[<span class="string">'phpExeDir'</span>] = <span class="string">'.'</span>;</span><br><span class="line">$phpConf[<span class="string">'phpConfFile'</span>] = <span class="string">'php.ini'</span>;</span><br><span class="line"><span class="comment">//PHP 5.6.x needs Apache 2.4.x and doesn't works with Apache 2.2.x</span></span><br><span class="line"><span class="comment">//$phpConf['apache']['2.2']['LoadModuleName'] = 'php5_module';</span></span><br><span class="line"><span class="comment">//$phpConf['apache']['2.2']['LoadModuleFile'] = 'php5apache2_2.dll';</span></span><br><span class="line"><span class="comment">//$phpConf['apache']['2.2']['AddModule'] =  '';</span></span><br><span class="line">$phpConf[<span class="string">'apache'</span>][<span class="string">'2.4'</span>][<span class="string">'LoadModuleName'</span>] = <span class="string">'php5_module'</span>;</span><br><span class="line">$phpConf[<span class="string">'apache'</span>][<span class="string">'2.4'</span>][<span class="string">'LoadModuleFile'</span>] = <span class="string">'php5apache2_4.dll'</span>;</span><br><span class="line">$phpConf[<span class="string">'apache'</span>][<span class="string">'2.4'</span>][<span class="string">'AddModule'</span>] =  <span class="string">''</span>;</span><br><span class="line"><span class="meta">?&gt;</span></span><br></pre></td></tr></table></figure>
+<hr>
+<ul>
+<li>显然是php5apache2_2.dll这个dll加载失败了。我想起小伙伴传给我的php文件里是没有这个dll的，这个dll是我从自己的php5.6.40拷贝过来的，我仔细看了一下他传给我的文件叫：<code>php5.3.29nts.rar</code>，我去查了一下nts的含义，果然是php版本的问题，官方的解释是这样的：<br>NTS全称：<code>Non Thread Safe</code>，TS是指具有多线程功能的构建。NTS仅指单线程构建。TS二进制文件的用例涉及与多线程SAPI和作为模块加载到Web服务器的PHP的交互。对于NTS二进制文件，广泛的用例是通过FastCGI协议与Web服务器进行交互，而不使用多线程（例如CLI）。</li>
+<li>如果你要使用apache，则需要使用TS版本；如果是IIS，则使用NTS等等<br>所以我又去下了一个5.3.29TS版本，下载好安装完成，却发现目录下没有<code>php5apache2_4.dll</code>而是<code>php5apache2_2.dll</code>，后来我看到wampserver.conf下第7行：<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">//PHP 5.6.x needs Apache 2.4.x and doesn&apos;t works with Apache 2.2.x</span><br></pre></td></tr></table></figure>
+而且我的wamper中只有一个apache2.4版本的，所以需要重新下个版本稍高点的</li>
+</ul>
+<h1 id="最后"><a href="#最后" class="headerlink" title="最后"></a>最后</h1><p>总结一下需要更改的配置文件</p>
+<ol>
+<li>将你的任意版本php下的php.ini复制到新php目录下，并替换其中的版本号</li>
+<li>(本例中)将php5版本下的wampserver.conf复制到新php目录下，具体改的地方要看实际情况</li>
+<li>将你的任意版本php下的phpForApache.ini复制到新php目录下，替换其中的版本号</li>
+<li>打开wamper的配置文件<code>{wamper安装路径}/wampmanager.ini</code>，全局搜索<code>[phpversion]</code></li>
+</ol>
+<figure class="highlight"><table><tr><td class="code"><pre><span class="line"><span class="section">[phpVersion]</span></span><br><span class="line"><span class="comment">;WAMPPHPVERSIONSTART</span></span><br><span class="line">Type: item; Caption: "5.6.11"; Action: multi; Actions:switchPhp5.6.11; Glyph: 13</span><br><span class="line">Type: item; Caption: "5.6.40"; Action: multi; Actions:switchPhp5.6.40</span><br><span class="line">Type: item; Caption: "7.0.33"; Action: multi; Actions:switchPhp7.0.33</span><br><span class="line">Type: item; Caption: "7.1.29"; Action: multi; Actions:switchPhp7.1.29</span><br><span class="line">Type: item; Caption: "7.2.18"; Action: multi; Actions:switchPhp7.2.18</span><br><span class="line">Type: item; Caption: "7.3.5"; Action: multi; Actions:switchPhp7.3.5</span><br><span class="line"><span class="section">[switchPhp5.6.11]</span></span><br><span class="line">Action: service; Service: wampapache64; ServiceAction: stop; Flags: ignoreerrors waituntilterminated</span><br><span class="line">Action: run; FileName: "D:/Wampserver/bin/php/php5.6.40/php-win.exe";Parameters: "switchPhpVersion.php 5.6.11";WorkingDir: "D:/Wampserver/scripts"; Flags: waituntilterminated</span><br><span class="line">Action: run; FileName: "D:/Wampserver/bin/php/php5.6.40/php.exe";Parameters: "switchMysqlPort.php 3306";WorkingDir: "D:/Wampserver/scripts"; Flags: waituntilterminated</span><br><span class="line">Action: run; FileName: "D:/Wampserver/bin/php/php5.6.40/php-win.exe";Parameters: "refresh.php";WorkingDir: "D:/Wampserver/scripts"; Flags: waituntilterminated</span><br><span class="line">Action: run; FileName: "net"; Parameters: "start wampapache64"; ShowCmd: hidden; Flags: waituntilterminated</span><br><span class="line">Action: resetservices</span><br><span class="line">Action: readconfig</span><br><span class="line"><span class="section">[switchPhp5.6.40]</span></span><br><span class="line">Action: service; Service: wampapache64; ServiceAction: stop; Flags: ignoreerrors waituntilterminated</span><br><span class="line">Action: run; FileName: "D:/Wampserver/bin/php/php5.6.40/php-win.exe";Parameters: "switchPhpVersion.php 5.6.40";WorkingDir: "D:/Wampserver/scripts"; Flags: waituntilterminated</span><br><span class="line">Action: run; FileName: "D:/Wampserver/bin/php/php5.6.40/php.exe";Parameters: "switchMysqlPort.php 3306";WorkingDir: "D:/Wampserver/scripts"; Flags: waituntilterminated</span><br><span class="line">Action: run; FileName: "D:/Wampserver/bin/php/php5.6.40/php-win.exe";Parameters: "refresh.php";WorkingDir: "D:/Wampserver/scripts"; Flags: waituntilterminated</span><br><span class="line">Action: run; FileName: "net"; Parameters: "start wampapache64"; ShowCmd: hidden; Flags: waituntilterminated</span><br><span class="line">Action: resetservices</span><br><span class="line">Action: readconfig</span><br><span class="line"><span class="section">[switchPhp7.0.33]</span></span><br><span class="line">Action: service; Service: wampapache64; ServiceAction: stop; Flags: ignoreerrors waituntilterminated</span><br><span class="line">Action: run; FileName: "D:/Wampserver/bin/php/php5.6.40/php-win.exe";Parameters: "switchPhpVersion.php 7.0.33";WorkingDir: "D:/Wampserver/scripts"; Flags: waituntilterminated</span><br><span class="line">Action: run; FileName: "D:/Wampserver/bin/php/php5.6.40/php.exe";Parameters: "switchMysqlPort.php 3306";WorkingDir: "D:/Wampserver/scripts"; Flags: waituntilterminated</span><br><span class="line">Action: run; FileName: "D:/Wampserver/bin/php/php5.6.40/php-win.exe";Parameters: "refresh.php";WorkingDir: "D:/Wampserver/scripts"; Flags: waituntilterminated</span><br><span class="line">Action: run; FileName: "net"; Parameters: "start wampapache64"; ShowCmd: hidden; Flags: waituntilterminated</span><br><span class="line">Action: resetservices</span><br><span class="line">Action: readconfig</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li><p>在<code>;WAMPPHPVERSIONSTART</code>下方插入:<code>Type: item; Caption: &quot;{你的版本号}}&quot;; Action: multi; Actions:switchPhp{你的版本号}</code></p>
+</li>
+<li><p>接下来在<code>[switchPhpx.x.xx]</code>前插入</p>
+</li>
+</ul>
+<figure class="highlight"><table><tr><td class="code"><pre><span class="line"><span class="section">[switchPhp&#123;你的版本号&#125;]</span></span><br><span class="line">Action: service; Service: wampapache64; ServiceAction: stop; Flags: ignoreerrors waituntilterminated</span><br><span class="line">Action: run; FileName: "&#123;安装路径&#125;/php/php&#123;你的版本号&#125;/php-win.exe";Parameters: "switchPhpVersion.php &#123;你的版本号&#125;";WorkingDir: "&#123;安装路径&#125;scripts"; Flags: waituntilterminated</span><br><span class="line">Action: run; FileName: "&#123;安装路径&#125;/bin/php/php&#123;你的版本号&#125;/php.exe";Parameters: "switchMysqlPort.php 3306";WorkingDir: "&#123;安装路径&#125;/scripts"; Flags: waituntilterminated</span><br><span class="line">Action: run; FileName: "&#123;安装路径&#125;/bin/php/php&#123;你的版本号&#125;/php-win.exe";Parameters: "refresh.php";WorkingDir: "&#123;安装路径&#125;/scripts"; Flags: waituntilterminated</span><br><span class="line">Action: run; FileName: "net"; Parameters: "start wampapache64"; ShowCmd: hidden; Flags: waituntilterminated</span><br><span class="line">Action: resetservices</span><br><span class="line">Action: readconfig</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li>更改完成后退出wamper64，然后重启各项服务就🆗了</li>
+</ul>
+]]></content>
+      <categories>
+        <category>apache</category>
+      </categories>
+      <tags>
+        <tag>wamper64</tag>
       </tags>
   </entry>
   <entry>
@@ -222,48 +264,6 @@
       </categories>
       <tags>
         <tag>代码审计</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>记一次在wamper64中增加php遇到的问题</title>
-    <url>/2020/01/31/%E8%AE%B0%E4%B8%80%E6%AC%A1%E5%9C%A8wamper64%E4%B8%AD%E5%A2%9E%E5%8A%A0php%E7%89%88%E6%9C%AC%E8%B8%A9%E8%BF%87%E7%9A%84%E5%9D%91/</url>
-    <content><![CDATA[<p>在wamper64中手动增加php版本碰到了不少问题，记录总结一下</p>
-<a id="more"></a>
-<h1 id="原因"><a href="#原因" class="headerlink" title="原因"></a>原因</h1><p>因为要复现joomla3.4.6的一个RCE，php要求在5.6.13下才行，我的wamper自带的php5只有5.6.40，所以需要我手动安装一个低版本</p>
-<h1 id="过程"><a href="#过程" class="headerlink" title="过程"></a>过程</h1><p>一开始我找我的小伙伴要了他的phpstudy下的php5.3.29，按照网上的方法配置好后wamper是橘色的，一看果然有个服务没启动，于是我查看后发现是apache没有正常启动，<br>查看了一下错误日志后发现是php目录下的wampserver.conf文件内容出了问题<br>最后定位到第9行：</p>
-<figure class="highlight php"><table><tr><td class="code"><pre><span class="line"><span class="meta">&lt;?php</span></span><br><span class="line">$phpConf[<span class="string">'phpIniDir'</span>] = <span class="string">'.'</span>;</span><br><span class="line">$phpConf[<span class="string">'phpExeDir'</span>] = <span class="string">'.'</span>;</span><br><span class="line">$phpConf[<span class="string">'phpConfFile'</span>] = <span class="string">'php.ini'</span>;</span><br><span class="line"><span class="comment">//PHP 5.6.x needs Apache 2.4.x and doesn't works with Apache 2.2.x</span></span><br><span class="line"><span class="comment">//$phpConf['apache']['2.2']['LoadModuleName'] = 'php5_module';</span></span><br><span class="line"><span class="comment">//$phpConf['apache']['2.2']['LoadModuleFile'] = 'php5apache2_2.dll';</span></span><br><span class="line"><span class="comment">//$phpConf['apache']['2.2']['AddModule'] =  '';</span></span><br><span class="line">$phpConf[<span class="string">'apache'</span>][<span class="string">'2.4'</span>][<span class="string">'LoadModuleName'</span>] = <span class="string">'php5_module'</span>;</span><br><span class="line">$phpConf[<span class="string">'apache'</span>][<span class="string">'2.4'</span>][<span class="string">'LoadModuleFile'</span>] = <span class="string">'php5apache2_4.dll'</span>;</span><br><span class="line">$phpConf[<span class="string">'apache'</span>][<span class="string">'2.4'</span>][<span class="string">'AddModule'</span>] =  <span class="string">''</span>;</span><br><span class="line"><span class="meta">?&gt;</span></span><br></pre></td></tr></table></figure>
-<hr>
-<ul>
-<li>显然是php5apache2_2.dll这个dll加载失败了。我想起小伙伴传给我的php文件里是没有这个dll的，这个dll是我从自己的php5.6.40拷贝过来的，我仔细看了一下他传给我的文件叫：<code>php5.3.29nts.rar</code>，我去查了一下nts的含义，果然是php版本的问题，官方的解释是这样的：<br>NTS全称：<code>Non Thread Safe</code>，TS是指具有多线程功能的构建。NTS仅指单线程构建。TS二进制文件的用例涉及与多线程SAPI和作为模块加载到Web服务器的PHP的交互。对于NTS二进制文件，广泛的用例是通过FastCGI协议与Web服务器进行交互，而不使用多线程（例如CLI）。</li>
-<li>如果你要使用apache，则需要使用TS版本；如果是IIS，则使用NTS等等<br>所以我又去下了一个5.3.29TS版本，下载好安装完成，却发现目录下没有<code>php5apache2_4.dll</code>而是<code>php5apache2_2.dll</code>，后来我看到wampserver.conf下第7行：<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">//PHP 5.6.x needs Apache 2.4.x and doesn&apos;t works with Apache 2.2.x</span><br></pre></td></tr></table></figure>
-而且我的wamper中只有一个apache2.4版本的，所以需要重新下个版本稍高点的</li>
-</ul>
-<h1 id="最后"><a href="#最后" class="headerlink" title="最后"></a>最后</h1><p>总结一下需要更改的配置文件</p>
-<ol>
-<li>将你的任意版本php下的php.ini复制到新php目录下，并替换其中的版本号</li>
-<li>(本例中)将php5版本下的wampserver.conf复制到新php目录下，具体改的地方要看实际情况</li>
-<li>将你的任意版本php下的phpForApache.ini复制到新php目录下，替换其中的版本号</li>
-<li>打开wamper的配置文件<code>{wamper安装路径}/wampmanager.ini</code>，全局搜索<code>[phpversion]</code></li>
-</ol>
-<figure class="highlight"><table><tr><td class="code"><pre><span class="line"><span class="section">[phpVersion]</span></span><br><span class="line"><span class="comment">;WAMPPHPVERSIONSTART</span></span><br><span class="line">Type: item; Caption: "5.6.11"; Action: multi; Actions:switchPhp5.6.11; Glyph: 13</span><br><span class="line">Type: item; Caption: "5.6.40"; Action: multi; Actions:switchPhp5.6.40</span><br><span class="line">Type: item; Caption: "7.0.33"; Action: multi; Actions:switchPhp7.0.33</span><br><span class="line">Type: item; Caption: "7.1.29"; Action: multi; Actions:switchPhp7.1.29</span><br><span class="line">Type: item; Caption: "7.2.18"; Action: multi; Actions:switchPhp7.2.18</span><br><span class="line">Type: item; Caption: "7.3.5"; Action: multi; Actions:switchPhp7.3.5</span><br><span class="line"><span class="section">[switchPhp5.6.11]</span></span><br><span class="line">Action: service; Service: wampapache64; ServiceAction: stop; Flags: ignoreerrors waituntilterminated</span><br><span class="line">Action: run; FileName: "D:/Wampserver/bin/php/php5.6.40/php-win.exe";Parameters: "switchPhpVersion.php 5.6.11";WorkingDir: "D:/Wampserver/scripts"; Flags: waituntilterminated</span><br><span class="line">Action: run; FileName: "D:/Wampserver/bin/php/php5.6.40/php.exe";Parameters: "switchMysqlPort.php 3306";WorkingDir: "D:/Wampserver/scripts"; Flags: waituntilterminated</span><br><span class="line">Action: run; FileName: "D:/Wampserver/bin/php/php5.6.40/php-win.exe";Parameters: "refresh.php";WorkingDir: "D:/Wampserver/scripts"; Flags: waituntilterminated</span><br><span class="line">Action: run; FileName: "net"; Parameters: "start wampapache64"; ShowCmd: hidden; Flags: waituntilterminated</span><br><span class="line">Action: resetservices</span><br><span class="line">Action: readconfig</span><br><span class="line"><span class="section">[switchPhp5.6.40]</span></span><br><span class="line">Action: service; Service: wampapache64; ServiceAction: stop; Flags: ignoreerrors waituntilterminated</span><br><span class="line">Action: run; FileName: "D:/Wampserver/bin/php/php5.6.40/php-win.exe";Parameters: "switchPhpVersion.php 5.6.40";WorkingDir: "D:/Wampserver/scripts"; Flags: waituntilterminated</span><br><span class="line">Action: run; FileName: "D:/Wampserver/bin/php/php5.6.40/php.exe";Parameters: "switchMysqlPort.php 3306";WorkingDir: "D:/Wampserver/scripts"; Flags: waituntilterminated</span><br><span class="line">Action: run; FileName: "D:/Wampserver/bin/php/php5.6.40/php-win.exe";Parameters: "refresh.php";WorkingDir: "D:/Wampserver/scripts"; Flags: waituntilterminated</span><br><span class="line">Action: run; FileName: "net"; Parameters: "start wampapache64"; ShowCmd: hidden; Flags: waituntilterminated</span><br><span class="line">Action: resetservices</span><br><span class="line">Action: readconfig</span><br><span class="line"><span class="section">[switchPhp7.0.33]</span></span><br><span class="line">Action: service; Service: wampapache64; ServiceAction: stop; Flags: ignoreerrors waituntilterminated</span><br><span class="line">Action: run; FileName: "D:/Wampserver/bin/php/php5.6.40/php-win.exe";Parameters: "switchPhpVersion.php 7.0.33";WorkingDir: "D:/Wampserver/scripts"; Flags: waituntilterminated</span><br><span class="line">Action: run; FileName: "D:/Wampserver/bin/php/php5.6.40/php.exe";Parameters: "switchMysqlPort.php 3306";WorkingDir: "D:/Wampserver/scripts"; Flags: waituntilterminated</span><br><span class="line">Action: run; FileName: "D:/Wampserver/bin/php/php5.6.40/php-win.exe";Parameters: "refresh.php";WorkingDir: "D:/Wampserver/scripts"; Flags: waituntilterminated</span><br><span class="line">Action: run; FileName: "net"; Parameters: "start wampapache64"; ShowCmd: hidden; Flags: waituntilterminated</span><br><span class="line">Action: resetservices</span><br><span class="line">Action: readconfig</span><br></pre></td></tr></table></figure>
-
-<ul>
-<li><p>在<code>;WAMPPHPVERSIONSTART</code>下方插入:<code>Type: item; Caption: &quot;{你的版本号}}&quot;; Action: multi; Actions:switchPhp{你的版本号}</code></p>
-</li>
-<li><p>接下来在<code>[switchPhpx.x.xx]</code>前插入</p>
-</li>
-</ul>
-<figure class="highlight"><table><tr><td class="code"><pre><span class="line"><span class="section">[switchPhp&#123;你的版本号&#125;]</span></span><br><span class="line">Action: service; Service: wampapache64; ServiceAction: stop; Flags: ignoreerrors waituntilterminated</span><br><span class="line">Action: run; FileName: "&#123;安装路径&#125;/php/php&#123;你的版本号&#125;/php-win.exe";Parameters: "switchPhpVersion.php &#123;你的版本号&#125;";WorkingDir: "&#123;安装路径&#125;scripts"; Flags: waituntilterminated</span><br><span class="line">Action: run; FileName: "&#123;安装路径&#125;/bin/php/php&#123;你的版本号&#125;/php.exe";Parameters: "switchMysqlPort.php 3306";WorkingDir: "&#123;安装路径&#125;/scripts"; Flags: waituntilterminated</span><br><span class="line">Action: run; FileName: "&#123;安装路径&#125;/bin/php/php&#123;你的版本号&#125;/php-win.exe";Parameters: "refresh.php";WorkingDir: "&#123;安装路径&#125;/scripts"; Flags: waituntilterminated</span><br><span class="line">Action: run; FileName: "net"; Parameters: "start wampapache64"; ShowCmd: hidden; Flags: waituntilterminated</span><br><span class="line">Action: resetservices</span><br><span class="line">Action: readconfig</span><br></pre></td></tr></table></figure>
-
-<ul>
-<li>更改完成后退出wamper64，然后重启各项服务就🆗了</li>
-</ul>
-]]></content>
-      <categories>
-        <category>apache</category>
-      </categories>
-      <tags>
-        <tag>wamper64</tag>
       </tags>
   </entry>
   <entry>
